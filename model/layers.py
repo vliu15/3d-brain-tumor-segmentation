@@ -1,5 +1,5 @@
 import tensorflow as tf
-from model.utils import GroupNormalization
+from model.group_norm import GroupNormalization
 
 
 class ConvLayer(tf.keras.layers.Layer):

@@ -2,6 +2,7 @@ import tensorflow as tf
 
 from model.layers import ConvBlock
 
+
 class ConvEncoder(tf.keras.layers.Layer):
     def __init__(self,
                  data_format='channels_last',
@@ -31,7 +32,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                     The dropout rate after initial convolution. Defaults to 0.2,
                     as used in the paper.
         """
-
         super(ConvEncoder, self).__init__()
         # Input layers.
         self.inp_conv = tf.keras.layers.Conv3D(
