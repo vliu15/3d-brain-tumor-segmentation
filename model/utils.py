@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras import initializers, constraints, regularizers
 from tensorflow.keras import backend as K
 
-class GroupNormalization(tf.keras.Model):
+class GroupNormalization(tf.keras.layers.Layer):
     """Group normalization layer.
 
         Group Normalization divides the channels into groups and computes
