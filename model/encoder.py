@@ -8,6 +8,30 @@ class ConvEncoder(tf.keras.layers.Layer):
                  kernel_size=(3, 3, 3),
                  groups=8,
                  dropout=0.2):
+        """Initializes the model encoder.
+
+            See https://arxiv.org/pdf/1810.11654.pdf for more details.
+            The Encoder consists of a series of ConvBlocks, connected
+            by convolutional downsampling layers. Each ConvBlock is
+            1 pointwise convolutional layer + 2 ConvLayers, each of which
+            consists of a [GroupNormalization -> Relu -> Conv] series.
+
+            Args:
+                data_format: str, optional
+                    The format of the input data. Must be either 'channels_last'
+                    or 'channels_first'. Defaults to `channels_last` for CPU
+                    development. 'channels_first is used in the paper.
+                kernel_size: (int, int, int), optional
+                    The size of all convolutional kernels. Defaults to (3, 3, 3),
+                    as used in the paper.
+                groups: int, optional
+                    The size of each group for GroupNormalization. Defaults to
+                    8, as used in the paper.
+                dropout: float, optional
+                    The dropout rate after initial convolution. Defaults to 0.2,
+                    as used in the paper.
+        """
+
         super(ConvEncoder, self).__init__()
         # Input layers.
         self.inp_conv = tf.keras.layers.Conv3D(
@@ -82,17 +106,20 @@ class ConvEncoder(tf.keras.layers.Layer):
     def call(self, x):
         """Returns the forward pass of the ConvEncoder.
 
-            See https://arxiv.org/pdf/1810.11654.pdf for more details.
-            The Encoder consists of a series of ConvBlocks, connected
-            by convolutional downsampling layers. Each ConvBlock is
-            1 pointwise convolutional layer + 2 ConvLayers, each of which
-            consists of a [GroupNormalization -> Relu -> Conv] series.
+            {
+                Initial Conv3D_32 -> Dropout,
+                [ConvBlock_32] * 1 -> Downsample_32,
+                [ConvBlock_64] * 2 -> Downsample_64,
+                [ConvBlock_128] * 2 -> Downsample_128,
+                [ConvBlock_256] * 4
+            }
 
             Args:
-                x: the input image to the encoder.
+                x: Tensor or np.ndarray
+                    The input image to the encoder.
             Shape:
-                if data_format == 'channels_first': shape=(4, 160, 192, 128)
-                if data_format == 'channels_last': shape=(160, 192, 128, 4)
+                If data_format == 'channels_first': shape=(4, 160, 192, 128).
+                If data_format == 'channels_last': shape=(160, 192, 128, 4).
                 
             Returns:
                 -   Outputs from ConvBlocks of filter sizes 32, 64, and 128 for

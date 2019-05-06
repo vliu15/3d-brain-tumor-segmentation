@@ -4,6 +4,7 @@ import numpy as np
 from model.encoder import ConvEncoder
 
 def test_encoder():
+    """Tests that the encoder output shapes are correct."""
     enc = ConvEncoder(data_format='channels_last',
                       kernel_size=(3, 3, 3),
                       groups=8,
