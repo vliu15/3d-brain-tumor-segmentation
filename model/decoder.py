@@ -142,7 +142,7 @@ class ConvDecoder(tf.keras.layers.Layer):
             }
 
             Args:
-                enc_outs: List[Tensor]
+                enc_outs: (Tensor, Tensor, Tensor, Tensor)
                     Contains residual outputs of the encoder from forward
                     pass. Must contain (in order) the ConvBlock outputs at
                     the 32, 64, 128, and 256 filter sizes.
