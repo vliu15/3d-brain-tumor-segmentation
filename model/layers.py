@@ -7,7 +7,8 @@ class ConvLayer(tf.keras.layers.Layer):
                  filters,
                  kernel_size=3,
                  data_format='channels_last',
-                 groups=8):
+                 groups=8,
+                 kernel_regularizer=None):
         """Initializes one convolutional layer.
 
             Each convolutional layer is comprised of a group normalization,
@@ -40,7 +41,8 @@ class ConvLayer(tf.keras.layers.Layer):
                             kernel_size=kernel_size,
                             strides=1,
                             padding='same',
-                            data_format=data_format)
+                            data_format=data_format,
+                            kernel_regularizer=kernel_regularizer)
 
     def call(self, x):
         """Returns the forward pass of the ConvLayer.
@@ -59,7 +61,8 @@ class ConvBlock(tf.keras.layers.Layer):
                  input_shape,
                  kernel_size=3,
                  data_format='channels_last',
-                 groups=8):
+                 groups=8,
+                 kernel_regularizer=None):
         """Initializes one convolutional block.
 
             A convolutional block (green block in the paper) consists of a pointwise
@@ -92,9 +95,20 @@ class ConvBlock(tf.keras.layers.Layer):
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
-                                data_format=data_format)
-        self.conv_layer1 = ConvLayer(filters, kernel_size=kernel_size, data_format=data_format, groups=8)
-        self.conv_layer2 = ConvLayer(filters, kernel_size=kernel_size, data_format=data_format, groups=8)
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer)
+        self.conv_layer1 = ConvLayer(
+                                filters=filters,
+                                kernel_size=kernel_size,
+                                data_format=data_format,
+                                groups=8,
+                                kernel_regularizer=kernel_regularizer)
+        self.conv_layer2 = ConvLayer(
+                                filters=filters,
+                                kernel_size=kernel_size,
+                                data_format=data_format,
+                                groups=8,
+                                kernel_regularizer=kernel_regularizer)
         self.residual = tf.keras.layers.Add()
 
     def call(self, x):

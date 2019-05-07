@@ -9,6 +9,6 @@ import model.volumetric_seq2seq
 __all__ = [model.layers,
            model.group_norm,
            model.encoder,
-           model.decoder
+           model.decoder,
            model.variational_autoencoder,
            model.volumetric_seq2seq]

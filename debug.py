@@ -11,7 +11,8 @@ def test_encoder(x):
                     data_format='channels_last',
                     kernel_size=3,
                     groups=8,
-                    dropout=0.2)
+                    dropout=0.2,
+                    kernel_regularizer=tf.keras.regularizers.l2(l=1e-5))
     
     conv_out_32, conv_out_64, conv_out_128, encoder_out = encoder(x)
     assert conv_out_32.shape == (1, 160, 192, 128, 32)
@@ -28,7 +29,8 @@ def test_decoder(enc_outs):
     decoder = ConvDecoder(
                     data_format='channels_last',
                     kernel_size=3,
-                    groups=8)
+                    groups=8,
+                    kernel_regularizer=tf.keras.regularizers.l2(l=1e-5))
 
     logits = decoder(enc_outs)
     assert logits.shape == (1, 160, 192, 128, 3)

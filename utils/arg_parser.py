@@ -14,6 +14,8 @@ def parser():
             help='Size of groups for group normalization.')
     parser.add_argument('--dropout', type=float, default=0.2,
             help='Dropout rate for dropout layer after initial convolution.')
+    parser.add_argument('--l2_scale', type=float, default=1e-5,
+            help='Scale of L2-regularization for convolution kernel weights.')
 
     args = parser.parse_args()
     return args
