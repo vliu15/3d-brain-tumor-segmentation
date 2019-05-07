@@ -5,7 +5,7 @@ from model.group_norm import GroupNormalization
 class ConvLayer(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
-                 kernel_size=(3, 3, 3),
+                 kernel_size=3,
                  data_format='channels_last',
                  groups=8):
         """Initializes one convolutional layer.
@@ -19,7 +19,7 @@ class ConvLayer(tf.keras.layers.Layer):
                     block. The output layer of this green block will have
                     this many number of channels.
                 kernel_size: kernel_size: (int, int, int), optional
-                    The size of all convolutional kernels. Defaults to (3, 3, 3),
+                    The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 data_format: str, optional
                     The format of the input data. Must be either 'channels_last'
@@ -57,7 +57,7 @@ class ConvBlock(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
                  input_shape,
-                 kernel_size=(3, 3, 3),
+                 kernel_size=3,
                  data_format='channels_last',
                  groups=8):
         """Initializes one convolutional block.
@@ -75,7 +75,7 @@ class ConvBlock(tf.keras.layers.Layer):
                     The input shape required by tf.keras.layers.Conv3D being the first
                     layer in this custom layer.
                 kernel_size: kernel_size: (int, int, int), optional
-                    The size of all convolutional kernels. Defaults to (3, 3, 3),
+                    The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 data_format: str, optional
                     The format of the input data. Must be either 'channels_last'
@@ -89,7 +89,7 @@ class ConvBlock(tf.keras.layers.Layer):
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
                                 filters=filters,
                                 input_shape=input_shape,
-                                kernel_size=(1, 1, 1),
+                                kernel_size=1,
                                 strides=1,
                                 padding='same',
                                 data_format=data_format)

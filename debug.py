@@ -5,12 +5,11 @@ import numpy as np
 from model.encoder import ConvEncoder
 from model.decoder import ConvDecoder
 
-
 def test_encoder(x):
     """Tests that the encoder output shapes are correct."""
     encoder = ConvEncoder(
                     data_format='channels_last',
-                    kernel_size=(3, 3, 3),
+                    kernel_size=3,
                     groups=8,
                     dropout=0.2)
     
@@ -24,12 +23,11 @@ def test_encoder(x):
 
     return (conv_out_32, conv_out_64, conv_out_128, encoder_out)
 
-
 def test_decoder(enc_outs):
     """Tests that the decoder output shapes are correct."""
     decoder = ConvDecoder(
                     data_format='channels_last',
-                    kernel_size=(3, 3, 3),
+                    kernel_size=3,
                     groups=8)
 
     logits = decoder(enc_outs)

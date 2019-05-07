@@ -6,7 +6,7 @@ from model.layers import ConvBlock
 class ConvEncoder(tf.keras.layers.Layer):
     def __init__(self,
                  data_format='channels_last',
-                 kernel_size=(3, 3, 3),
+                 kernel_size=3,
                  groups=8,
                  dropout=0.2):
         """Initializes the model encoder.
@@ -23,7 +23,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                     or 'channels_first'. Defaults to `channels_last` for CPU
                     development. 'channels_first is used in the paper.
                 kernel_size: (int, int, int), optional
-                    The size of all convolutional kernels. Defaults to (3, 3, 3),
+                    The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 groups: int, optional
                     The size of each group for GroupNormalization. Defaults to
