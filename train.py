@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 from utils.arg_parser import train_parser
 from utils.loss import compute_myrnenko_loss
+from utils.optimizer import ScheduledAdam
 from model.volumetric_seq2seq import VolumetricSeq2Seq
 
 
@@ -27,7 +28,7 @@ def main(args):
                         groups=args.gn_groups,
                         dropout=args.dropout,
                         kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
-    optimizer = tf.keras.optimizers.Adam(lr=args.lr)
+    optimizer = ScheduledAdam(learning_rate=args.lr)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
@@ -51,6 +52,8 @@ def main(args):
                 loss += sum(model.losses)
 
             grads = tape.gradient(loss, model.trainable_variables)
+
+            optimizer.update_lr(epoch_num=epoch)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
             train_loss.update_state(loss)

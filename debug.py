@@ -4,6 +4,7 @@ import numpy as np
 
 from model.encoder import ConvEncoder
 from model.decoder import ConvDecoder
+from utils.optimizer import ScheduledAdam
 
 def test_encoder(x):
     """Tests that the encoder output shapes are correct."""
@@ -40,10 +41,36 @@ def test_decoder(enc_outs):
     return logits
 
 
+def test_optimizer():
+    """Tests that the custom optimizer schedules correctly."""
+    optimizer = ScheduledAdam(learning_rate=1e-4, n_epochs=300)
+
+    assert optimizer.learning_rate.numpy() == np.array(1e-4, dtype=np.float32)
+
+    optimizer.update_lr(100)
+    assert optimizer.learning_rate.numpy() == np.array(1e-4 * ((1.0 - 100.0 / 300) ** 0.9), dtype=np.float32)
+    
+    optimizer.update_lr(300)
+    assert optimizer.learning_rate.numpy() == np.array(0, dtype=np.float32)
+
+    optimizer.update_lr(0)
+    assert optimizer.learning_rate.numpy() == np.array(1e-4, dtype=np.float32)
+
+    print('Passed basic sanity checks.')
+
+    return optimizer
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--test_decoder', action='store_true', default=False)
+    parser.add_argument('--test_encoder', action='store_true', default=False)
+    parser.add_argument('--test_optimizer', action='store_true', default=False)
     args = parser.parse_args()
+
+    if args.test_encoder:
+        x = np.random.randn(1, 160, 192, 128, 4)
+        _ = test_encoder(x)
 
     if args.test_decoder:
         enc32 = np.random.randn(1, 160, 192, 128, 32)
@@ -51,8 +78,8 @@ if __name__ == '__main__':
         enc128 = np.random.randn(1, 40, 48, 32, 128)
         enc256 = np.random.randn(1, 20, 24, 16, 256)
         enc_outs = (enc32, enc64, enc128, enc256)
-    else:
-        x = np.random.randn(1, 160, 192, 128, 4)
-        enc_outs = test_encoder(x)
-    
-    logits = test_decoder(enc_outs)
+
+        _ = test_decoder(enc_outs)
+
+    if args.test_optimizer:
+        _ = test_optimizer()
