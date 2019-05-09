@@ -7,18 +7,18 @@ from utils.loss import compute_myrnenko_loss
 from model.volumetric_seq2seq import VolumetricSeq2Seq
 
 
-def prepare_data(path, batch_size, seed=2021):
+def prepare_data(path, batch_size):
     data = np.load(path)
     data = (tf.data.Dataset.from_tensor_slices((data['X'], data['y']))
-                           .shuffle(seed)
+                           .shuffle(10000)
                            .batch(batch_size))
     return data
 
 
 def main(args):
     # Load data.
-    train_data = prepare_data(args.train_loc, args.batch_size, seed=2021)
-    val_data = prepare_data(args.val_loc, args.batch_size, seed=2021)
+    train_data = prepare_data(args.train_loc, args.batch_size)
+    val_data = prepare_data(args.val_loc, args.batch_size)
 
     # Set up.
     model = VolumetricSeq2Seq(
