@@ -32,7 +32,7 @@ class VolumetricSeq2Seq(tf.keras.Model):
 
     def call(self, x):
         enc_outs = self.encoder(x)
-        y_hat = self.decoder(enc_outs)
-        y_vae = self.vae(enc_outs[-1])
+        y_pred = self.decoder(enc_outs)
+        y_vae, z_mean, z_var = self.vae(enc_outs[-1])
 
-        return y_hat, y_vae
+        return y_pred, y_vae, z_mean, z_var

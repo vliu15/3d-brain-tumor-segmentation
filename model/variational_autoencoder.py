@@ -8,7 +8,10 @@ class VariationalAutoEncoder(tf.keras.layers.Layer):
                  kernel_size=3,
                  kernel_regularizer=None):
         super(VariationalAutoEncoder, self).__init__()
-        pass
 
     def call(self, x):
-        pass
+        y_vae = None
+        z_mean = None
+        z_var = None
+        return y_vae, z_mean, z_var
+        
