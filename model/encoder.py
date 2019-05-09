@@ -138,8 +138,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                     residual connections in the decoder.
                 -   Output of the forward pass.
         """
-        x = tf.expand_dims(x, axis=0)
-
         # Input layers.
         x = self.inp_conv(x)
         x = self.inp_dropout(x)

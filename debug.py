@@ -52,7 +52,7 @@ if __name__ == '__main__':
         enc256 = np.random.randn(1, 20, 24, 16, 256)
         enc_outs = (enc32, enc64, enc128, enc256)
     else:
-        x = np.random.randn(160, 192, 128, 4)
+        x = np.random.randn(1, 160, 192, 128, 4)
         enc_outs = test_encoder(x)
     
     logits = test_decoder(enc_outs)
