@@ -58,7 +58,6 @@ class ConvLayer(tf.keras.layers.Layer):
 class ConvBlock(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
-                 input_shape,
                  kernel_size=3,
                  data_format='channels_last',
                  groups=8,
@@ -74,9 +73,6 @@ class ConvBlock(tf.keras.layers.Layer):
                     The number of filters to use in the 3D convolutional
                     block. The output layer of this green block will have
                     this many number of channels.
-                input_shape: (int, int, int, int)
-                    The input shape required by tf.keras.layers.Conv3D being the first
-                    layer in this custom layer.
                 kernel_size: kernel_size: (int, int, int), optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
@@ -91,7 +87,6 @@ class ConvBlock(tf.keras.layers.Layer):
         super(ConvBlock, self).__init__()
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
                                 filters=filters,
-                                input_shape=input_shape,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',

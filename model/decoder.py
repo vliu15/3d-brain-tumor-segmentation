@@ -6,7 +6,6 @@ from model.layers import ConvBlock
 class DecoderBlock(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
-                 input_shape,
                  kernel_size=3,
                  data_format='channels_last',
                  groups=8,
@@ -23,9 +22,6 @@ class DecoderBlock(tf.keras.layers.Layer):
                     The number of filters to use in the 3D convolutional
                     block. The output layer of this green block will have
                     this many number of channels.
-                input_shape: (int, int, int, int)
-                    The input shape required by tf.keras.layers.Conv3D being the first
-                    layer in this custom layer.
                 kernel_size: kernel_size: (int, int, int), optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
@@ -41,7 +37,6 @@ class DecoderBlock(tf.keras.layers.Layer):
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
                                 filters=filters,
-                                input_shape=input_shape,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
@@ -50,14 +45,9 @@ class DecoderBlock(tf.keras.layers.Layer):
         self.upsample = tf.keras.layers.UpSampling3D(
                                 size=2,
                                 data_format=data_format)
-        new_shape = (input_shape[0] * 2, 
-                     input_shape[1] * 2,
-                     input_shape[2] * 2,
-                     filters)
         self.residual = tf.keras.layers.Add()
         self.conv_block = ConvBlock(
                                 filters=filters,
-                                input_shape=new_shape,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
@@ -105,21 +95,18 @@ class ConvDecoder(tf.keras.layers.Layer):
         super(ConvDecoder, self).__init__()
         self.dec_block_128 = DecoderBlock(
                                 filters=128,
-                                input_shape=(20, 24, 16, 256),
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer)
         self.dec_block_64 = DecoderBlock(
                                 filters=64,
-                                input_shape=(40, 48, 32, 128),
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer)
         self.dec_block_32 = DecoderBlock(
                                 filters=32,
-                                input_shape=(80, 96, 64, 64),
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,

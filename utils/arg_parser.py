@@ -1,6 +1,19 @@
 import argparse
 
 
+def prepro_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--brats_folder', type,str, required=True,
+            help='Location of unzipped BraTS data.')
+    parser.add_argument('--out_folder', type=str, required=True,
+            help='Where to write preprocessed data.')
+
+    args = parser.parse_args()
+
+    return args
+
+
 def train_parser():
     parser = argparse.ArgumentParser()
 
