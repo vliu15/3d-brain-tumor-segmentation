@@ -5,7 +5,7 @@ We seek to replicate the model that won the BraTS 2018 Segmentation Challenge. T
 ## TODO:
  - [x] Convolutional encoder
  - [x] Convolutional decoder
- - [ ] Variational autoencoder
+ - [x] Variational autoencoder
  - [x] Loss function: soft dice + KL divergence + L2
  - [ ] Adam optimizer with scheduled learning rate
  - [ ] Preprocessing
