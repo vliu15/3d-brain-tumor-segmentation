@@ -4,10 +4,26 @@ import argparse
 def prepro_parser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--brats_folder', type,str, required=True,
+    # Logistics.
+    parser.add_argument('--brats_folder', type=str, required=True,
             help='Location of unzipped BraTS data.')
-    parser.add_argument('--out_folder', type=str, required=True,
-            help='Where to write preprocessed data.')
+    parser.add_argument('--out_folder', type=str, default='./data',
+            help='Location to write preprocessed data.')
+    parser.add_argument('--shard_size', type=int, default=12,
+            help='Number of shards to split training data into.')
+    parser.add_argument('--data_format', type=str, default='channels_last',
+            choices=['channels_last', 'channels_first'],
+            help='Format of preprocessed data: `channels_last` or `channels_first`.')
+
+    # Specifics.
+    parser.add_argument('--create_val', action='store_true', default=False,
+            help='Whether to create validation split from training data.')
+    parser.add_argument('--intensity_shift', type=float, default=0.1,
+            help='Scale of intensity shift to apply per channel after normalization.')
+    parser.add_argument('--intensity_scale', type=float, default=0.1,
+            help='Epsilon (from 1.0) of intensity scaling per channel.')
+    parser.add_argument('--mirror_prob', type=float, default=0.5,
+            help='Probability that each inputs are flipped across all 3 axes.')
 
     args = parser.parse_args()
 
@@ -18,7 +34,7 @@ def train_parser():
     parser = argparse.ArgumentParser()
 
     # Hardware.
-    parser.add_argument('--gpu', action='store_true',
+    parser.add_argument('--gpu', action='store_true', default=False,
             help='Whether to use GPU in training.')
 
     # Data.

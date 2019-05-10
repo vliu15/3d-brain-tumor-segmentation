@@ -1,6 +1,5 @@
 # tensorflow-gpu==2.0.0-alpha0
 tensorflow==2.0.0-alpha0
-numpy
+numpy==1.15
 tqdm
-SimpleITK
-nipype
+nibabel

@@ -1,184 +1,259 @@
-"""
+'''
     Tools for converting, normalizing, and fixing the brats data.
     Taken from https://github.com/ellisdg/3DUnetCNN/blob/master/brats/preprocess.py.
-"""
+'''
 import glob
 import os
-import warnings
-import shutil
+import random
 
-import SimpleITK as sitk
 import numpy as np
-from nipype.interfaces.ants import N4BiasFieldCorrection
+import nibabel as nib
+from tqdm import tqdm
 
 from utils.arg_parser import prepro_parser
 
 
-ALL_MODALITIES = ["t1", "t1ce", "flair", "t2"]
+def get_npy_image(subject_folder, name):
+    file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii.gz'))[0]
+    return nib.load(file_card).dataobj
 
 
-def append_basename(in_file, append):
-    dirname, basename = os.path.split(in_file)
-    base, ext = basename.split(".", 1)
-    return os.path.join(dirname, base + append + "." + ext)
+def create_dataset(brats_folder, data_format='channels_last'):
+    """Returns lists of data inputs and labels.
 
+        Args:
+            brats_folder: path to the BraTS unprocessed data folder.
+            data_format: format of the target preprocessed data, either
+                `channels_first` or `channels_last`.
 
-def get_background_mask(in_folder, out_file, truth_name="GlistrBoost_ManuallyCorrected"):
+        Returns:
+            X: a list of examples, of shapes
+                if data_format == 'channels_first': shape=(4, 240, 240, 155)
+                if data_format == 'channels_last': shape=(240, 240, 155, 4)
+            y: a list of corresponding labels, of shapes
+                if data_format == 'channels_first': shape=(1, 240, 240, 155)
+                if data_format == 'channels_last': shape=(240, 240, 155, 1)
     """
-    This function computes a common background mask for all of the data in a subject folder.
-    in_folder: a subject folder from the BRATS dataset.
+    ALL_MODALITIES = ['t1', 't1ce', 'flair', 't2']
+    TRUTH = 'seg'
 
-    Args:
-        out_file: an image containing a mask that is 1 where the image
-            data for that subject contains the background.
-        truth_name: how the truth file is labeled int he subject folder
+    X = []
+    y = []
+    # Loop through each folder with `.nii.gz` files.
+    for subject_folder in tqdm(glob.glob(os.path.join(brats_folder, '*', '*')), leave=False):
 
-    Returns:
-        the path to the out_file
-    """
-    background_image = None
-    for name in ALL_MODALITIES + [truth_name]:
-        image = sitk.ReadImage(get_image(in_folder, name))
-        if background_image:
-            if name == truth_name and not (image.GetOrigin() == background_image.GetOrigin()):
-                image.SetOrigin(background_image.GetOrigin())
-            background_image = sitk.And(image == 0, background_image)
-        else:
-            background_image = image == 0
-    sitk.WriteImage(background_image, out_file)
-    return os.path.abspath(out_file)
-
-
-def convert_image_format(in_file, out_file):
-    sitk.WriteImage(sitk.ReadImage(in_file), out_file)
-    return out_file
-
-
-def window_intensities(in_file, out_file, min_percent=1, max_percent=99):
-    image = sitk.ReadImage(in_file)
-    image_data = sitk.GetArrayFromImage(image)
-    out_image = sitk.IntensityWindowing(image, np.percentile(image_data, min_percent), np.percentile(image_data,
-                                                                                                     max_percent))
-    sitk.WriteImage(out_image, out_file)
-    return os.path.abspath(out_file)
-
-
-def correct_bias(in_file, out_file, image_type=sitk.sitkFloat64):
-    """
-    Corrects the bias using ANTs N4BiasFieldCorrection. If this fails,
-    will then attempt to correct bias using SimpleITK.
-
-    Args:
-        in_file: input file path
-        out_file: output file path
-
-    Return:
-        file path to the bias corrected image
-    """
-    correct = N4BiasFieldCorrection()
-    correct.inputs.input_image = in_file
-    correct.inputs.output_image = out_file
-    try:
-        done = correct.run()
-        return done.outputs.output_image
-    except IOError:
-        warnings.warn(RuntimeWarning("ANTs N4BIasFieldCorrection could not be found."
-                                     "Will try using SimpleITK for bias field correction"
-                                     " which will take much longer. To fix this problem, add N4BiasFieldCorrection"
-                                     " to your PATH system variable. (example: EXPORT PATH=${PATH}:/path/to/ants/bin)"))
-        input_image = sitk.ReadImage(in_file, image_type)
-        output_image = sitk.N4BiasFieldCorrection(input_image, input_image > 0)
-        sitk.WriteImage(output_image, out_file)
-        return os.path.abspath(out_file)
-
-
-def rescale(in_file, out_file, minimum=0, maximum=20000):
-    image = sitk.ReadImage(in_file)
-    sitk.WriteImage(sitk.RescaleIntensity(image, minimum, maximum), out_file)
-    return os.path.abspath(out_file)
-
-
-def get_image(subject_folder, name):
-    file_card = os.path.join(subject_folder, "*" + name + ".nii.gz")
-    try:
-        return glob.glob(file_card)[0]
-    except IndexError:
-        raise RuntimeError("Could not find file matching {}".format(file_card))
-
-
-def background_to_zero(in_file, background_file, out_file):
-    sitk.WriteImage(sitk.Mask(sitk.ReadImage(in_file), sitk.ReadImage(background_file, sitk.sitkUInt8) == 0),
-                    out_file)
-    return out_file
-
-
-def check_origin(in_file, in_file2):
-    image = sitk.ReadImage(in_file)
-    image2 = sitk.ReadImage(in_file2)
-    if not image.GetOrigin() == image2.GetOrigin():
-        image.SetOrigin(image2.GetOrigin())
-        sitk.WriteImage(image, in_file)
-
-
-def normalize_image(in_file, out_file, bias_correction=True):
-    if bias_correction:
-        correct_bias(in_file, out_file)
-    else:
-        shutil.copy(in_file, out_file)
-    return out_file
-
-
-def convert_brats_folder(in_folder, out_folder, truth_name='seg', no_bias_correction_modalities=None):
-    for name in ALL_MODALITIES:
-        try:
-            image_file = get_image(in_folder, name)
-        except RuntimeError as error:
-            if name == 't1ce':
-                image_file = get_image(in_folder, 't1Gd')
-                truth_name = "GlistrBoost_ManuallyCorrected"
-            else:
-                raise error
-
-        out_file = os.path.abspath(os.path.join(out_folder, name + ".nii.gz"))
-        perform_bias_correction = no_bias_correction_modalities and name not in no_bias_correction_modalities
-        normalize_image(image_file, out_file, bias_correction=perform_bias_correction)
-
-    # Copy the truth file.
-    try:
-        truth_file = get_image(in_folder, truth_name)
-    except RuntimeError:
-        truth_file = get_image(in_folder, truth_name.split("_")[0])
-
-    out_file = os.path.abspath(os.path.join(out_folder, "truth.nii.gz"))
-    shutil.copy(truth_file, out_file)
-    check_origin(out_file, get_image(in_folder, ALL_MODALITIES[0]))
-
-
-def convert_brats_data(brats_folder, out_folder, overwrite=False, no_bias_correction_modalities=("flair",)):
-    """
-    Preprocesses and writes BraTS data and to output folder. Assumes the original folder structure.
-
-    Args:
-        brats_folder: folder containing the original BraTS data.
-        out_folder: output folder to which the preprocessed data will be written.
-        overwrite: set to True in order to redo all the preprocessing.
-        no_bias_correction_modalities: performing bias correction could reduce the
-            signal of certain modalities. If concerned about a reduction in signal
-            for a specific modality, specify by including the given modality in a
-            list or tuple.
-    """
-    for subject_folder in glob.glob(os.path.join(brats_folder, "*", "*")):
+        # Create corresponding output folder.
         if os.path.isdir(subject_folder):
-            subject = os.path.basename(subject_folder)
-            new_subject_folder = os.path.join(out_folder, os.path.basename(os.path.dirname(subject_folder)),
-                                              subject)
-            if not os.path.exists(new_subject_folder) or overwrite:
-                if not os.path.exists(new_subject_folder):
-                    os.makedirs(new_subject_folder)
-                convert_brats_folder(subject_folder, new_subject_folder,
-                                     no_bias_correction_modalities=no_bias_correction_modalities)
+            if data_format == 'channels_last':
+                X_example = np.stack(
+                    [get_npy_image(subject_folder, name) for name in ALL_MODALITIES], axis=-1)
+                y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=-1)
+            elif data_format == 'channels_first':
+                X_example = np.stack(
+                    [get_npy_image(subject_folder, name) for name in ALL_MODALITIES], axis=0)
+                y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=0)
+        else:
+            raise RuntimeError
+        
+        X.append(X_example)
+        y.append(y_example)
+
+    if data_format == 'channels_last':
+        n_channels = X[0].shape[-1]
+    elif data_format == 'channels_first':
+        n_channels = X[0][0]
+
+    return X, y, n_channels
+
+
+def create_splits(X, y):
+    """Creates 10:1 train:val split with the data.
+    
+        Args:
+            X: list of inputs (np.ndarray's)
+            y: list of labels (np.ndarray's)
+
+        Returns:
+    """
+    data = list(zip(X, y))
+    random.shuffle(data)
+    X, y = list(zip(*data))
+    split = len(data) // 11
+
+    X_train = np.stack(X[split:], axis=0)
+    y_train = np.stack(y[split:], axis=0)
+    X_val = np.stack(X[:split], axis=0)
+    y_val = np.stack(y[:split], axis=0)
+
+    return X_train, y_train, X_val, y_val
+
+
+def compute_train_norm(X_train, data_format='channels_last'):
+    """Returns mean and standard deviation per channel for training inputs."""
+    if data_format == 'channels_last':
+        X_train = np.reshape(X_train, newshape=(X_train.shape[-1], -1))
+    elif data_format == 'channels_first':
+        X_train = np.reshape(X_train, newshape=(X_train.shape[0], -1))
+
+    # Compute mean and std for each channel
+    voxel_mean = np.zeros(X_train.shape[0])
+    voxel_std = np.zeros(X_train.shape[0])
+    for i, channel in tqdm(enumerate(X_train), leave=False):
+        voxel_mean[i] = np.mean(channel[channel != 0])
+        voxel_std[i] = np.std(channel[channel != 0])
+
+    return voxel_mean, voxel_std
+
+
+def normalize(voxel_mean, voxel_std, X, data_format='channels_last'):
+    """Normalizes an array of features X given voxel-wise mean and std."""
+    # Reshape mean and std into broadcastable with X, then loop per channel to avoid OOM.
+    if data_format == 'channels_last':
+        voxel_mean = np.reshape(voxel_mean, newshape=(1, 1, 1, voxel_mean.shape[-1]))
+        voxel_std = np.reshape(voxel_std, newshape=(1, 1, 1, voxel_std.shape[-1]))
+        for b in tqdm(range(X.shape[0]), leave=False):
+            X[b] = (X[b] - voxel_mean) / voxel_std
+    elif data_format == 'channels_first':
+        voxel_mean = np.reshape(voxel_mean, newshape=(voxel_mean.shape[-1], 1, 1, 1))
+        voxel_std = np.reshape(voxel_std, newshape=(voxel_std.shape[-1], 1, 1, 1))
+        for b in tqdm(range(X.shape[0]), leave=False):
+            X[b] = (X[b] - voxel_mean) / voxel_std
+
+    return X
+
+
+def intensify(shifts, scales, X, data_format='channels_last'):
+    """Applies intensity shifting and scaling on X given shift and scale values."""
+    # Reshape shifts and scales into broadcastable with X, then loop per channel to avoid OOM.
+    if data_format == 'channels_last':
+        shifts = np.reshape(shifts, newshape=(1, 1, 1, shifts.shape[-1]))
+        scales = np.reshape(scales, newshape=(1, 1, 1, scales.shape[-1]))
+        for b in tqdm(range(X.shape[0]), leave=False):
+            X[b] = (X[b] - shifts) * scales
+    elif data_format == 'channels_first':
+        shifts = np.reshape(shifts, newshape=(shifts.shape[-1], 1, 1, 1))
+        scales = np.reshape(scales, newshape=(scales.shape[-1], 1, 1, 1))
+        for b in tqdm(range(X.shape[0]), leave=False):
+            X[b] = (X[b] - shifts) * scales
+
+    return X
+
+
+def main(args):
+    # Convert .nii.gz data files to a list Numpy arrays.
+    print('Convert data to Numpy arrays.')
+    X_train, y_train, n_channels = create_dataset(args.brats_folder, data_format=args.data_format)
+
+    # Create dataset splits (if necessary).
+    if args.create_val:
+        print('Create train / val splits.')
+        X_train, y_train, X_val, y_val = create_splits(X_train, y_train)
+        print(f'X_train shape: {X_train.shape}.')
+        print(f'y_train shape: {y_train.shape}.')
+        print(f'X_val shape: {X_val.shape}.')
+        print(f'y_val shape: {y_val.shape}.')
+    else:
+        X_train = np.stack(X_train, axis=0)
+        y_train = np.stack(y_train, axis=0)
+        print(f'X_train shape: {X_train.shape}.')
+        print(f'y_train shape: {y_train.shape}.')
+
+    # Compute mean and std for normalization.
+    print('Calculate voxel-wise mean and std per channel of training set.')
+    voxel_mean, voxel_std = compute_train_norm(X_train, data_format=args.data_format)
+    np.save(f'./{args.out_folder}/voxel_mean_std.npy', {'mean': voxel_mean, 'std': voxel_std})
+    print(f'Voxel-wise mean per channel: {voxel_mean}.')
+    print(f'Voxel-wise std per channel: {voxel_std}.')
+
+    # Normalize training and validation data.
+    print('Apply per channel normalization.')
+    num_shards = X_train.shape[0] // args.shard_size + 1
+    for shard in tqdm(range(num_shards)):
+        X_shard = normalize(voxel_mean,
+                            voxel_std,
+                            X_train[shard*args.shard_size:(shard+1)*args.shard_size, ...],
+                            data_format=args.data_format)
+        y_shard = y_train[shard*args.shard_size:(shard+1)*args.shard_size, ...]
+        X_train[shard*args.shard_size:(shard+1)*args.shard_size, ...] = X_shard
+    if args.create_val:
+        num_shards = X_val.shape[0] // args.shard_size + 1
+        for shard in tqdm(range(num_shards)):
+            X_shard = normalize(voxel_mean,
+                                voxel_std,
+                                X_val[shard*args.shard_size:(shard+1)*args.shard_size, ...],
+                                data_format=args.data_format)
+            y_shard = y_val[shard*args.shard_size:(shard+1)*args.shard_size, ...]
+            X_val[shard*args.shard_size:(shard+1)*args.shard_size, ...] = X_shard
+
+    # Compute shifts and scales for intensification.
+    print('Calculate intensity shifts and scales per channel.')
+    shifts = np.random.uniform(low=0.0-args.intensity_shift, high=0.0+args.intensity_shift, size=(n_channels,))
+    shifts = shifts * voxel_std
+    scales = np.random.uniform(low=1.0-args.intensity_scale, high=1.0+args.intensity_scale, size=(n_channels,))
+    np.save(f'./{args.out_folder}/intensity_shifts_scales.npy', {'shifts': shifts, 'scales': scales})
+    print(f'Intensity shifts per channel: {shifts}.')
+    print(f'Intensity scales per channel: {scales}.')
+
+    # Apply intensity shifts and scales.
+    print('Apply per channel intensity shifts and scales.')
+    num_shards = X_train.shape[0] // args.shard_size + 1
+    for shard in tqdm(range(num_shards)):
+        X_shard = intensify(shifts,
+                            scales,
+                            X_train[shard*args.shard_size:(shard+1)*args.shard_size, ...],
+                            data_format=args.data_format)
+        y_shard = y_train[shard*args.shard_size:(shard+1)*args.shard_size, ...]
+        X_train[shard*args.shard_size:(shard+1)*args.shard_size, ...] = X_shard
+    if args.create_val:
+        print('Save validation data.')
+        num_shards = X_val.shape[0] // args.shard_size + 1
+        for shard in tqdm(range(num_shards)):
+            X_shard = intensify(shifts,
+                                scales,
+                                X_val[shard*args.shard_size:(shard+1)*args.shard_size, ...],
+                                data_format=args.data_format)
+            y_shard = y_val[shard*args.shard_size:(shard+1)*args.shard_size, ...]
+            np.save(f'./{args.out_folder}/val_shard_{shard}', {'X': X_shard, 'y': y_shard})
+
+    # Free memory.
+    if args.create_val:
+        del X_val
+        del y_val
+
+    # Randomly flip for data augmentation.
+    print('Randomly augment training data.')
+    augmented_X = []
+    augmented_y = []
+    for example, label in tqdm(zip(X_train, y_train)):
+        if np.random.uniform() < args.mirror_prob:
+            if args.data_format == 'channels_last':
+                X_augment = np.flip(example, axis=(1, 2, 3))
+                y_augment = np.flip(label, axis=(1, 2, 3))
+            elif args.data_format == 'channels_first':
+                X_augment = np.flip(example, axis=(2, 3, 4))
+                y_augment = np.flip(label, axis=(2, 3, 4))
+            augmented_X.append(X_augment)
+            augmented_y.append(y_augment)
+
+    print('Save training data.')
+    num_shards = X_train.shape[0] // args.shard_size + 1
+    for shard in tqdm(range(num_shards)):
+        X_shard = X_train[shard*args.shard_size:(shard+1)*args.shard_size, ...]
+        y_shard = y_train[shard*args.shard_size:(shard+1)*args.shard_size, ...]
+        np.save(f'./{args.out_folder}/train_shard_{shard}.npy', {'X': X_shard, 'y': y_shard})
+
+    # Free memory.
+    del X_train
+    del y_train
+
+    print('Save augmented training data.')
+    num_shards = len(augmented_X) // args.shard_size + 1
+    for shard in tqdm(range(num_shards)):
+        X_shard = np.stack(augmented_X[shard*args.shard_size:(shard+1)*args.shard_size], axis=0)
+        y_shard = np.stack(augmented_y[shard*args.shard_size:(shard+1)*args.shard_size], axis=0)
+        np.save(f'./{args.out_folder}/augment_shard_{shard}.npy', {'X': X_shard, 'y': y_shard})
 
 
 if __name__ == '__main__':
     args = prepro_parser()
-    convert_brats_data(args.brats_folder, args.out_folder)
+    main(args)
