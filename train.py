@@ -26,7 +26,7 @@ def prepare_dataset(path, batch_size):
     }
 
     dataset = tf.data.TFRecordDataset(path)
-    dataset = dataset.map(parse_example).batch(batch_size)
+    dataset = dataset.map(parse_example).shuffle(570).batch(batch_size)
 
     return dataset, get_dataset_len(dataset)
 
