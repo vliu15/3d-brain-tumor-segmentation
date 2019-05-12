@@ -10,8 +10,15 @@ from model.volumetric_cnn import VolumetricCNN
 
 
 def prepare_dataset(path, batch_size):
+    """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
+        """Mapping function to parse a single example."""
         return tf.io.parse_single_example(example_proto, example_desc)
+
+    def get_dataset_len(tf_dataset):
+        """Returns length of dataset until tf.data.experimental.cardinality is fixed."""
+        # return tf.data.experimental.cardinality(tf_dataset)
+        return sum(1 for _ in tf_dataset)
 
     example_desc = {
         'X': tf.io.FixedLenFeature([160 * 192 * 128 * 4], tf.float32),
@@ -21,13 +28,13 @@ def prepare_dataset(path, batch_size):
     dataset = tf.data.TFRecordDataset(path)
     dataset = dataset.map(parse_example).batch(batch_size)
 
-    return dataset
+    return dataset, get_dataset_len(dataset)
 
 
 def main(args):
     # Load data.
-    train_data = prepare_dataset(args.train_loc, args.batch_size)
-    val_data = prepare_dataset(args.val_loc, args.batch_size)
+    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size)
+    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size)
 
     # Set up.
     model = VolumetricCNN(
@@ -41,15 +48,12 @@ def main(args):
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
 
-
-    # n_train = tf.data.experimental.cardinality(train_data)
-    # n_val = tf.data.experimental.cardinality(val_data)
-    n_train = 260
-    n_val = 25
+    print(f'{n_train} training examples.')
+    print(f'{n_val} validation examples.')
 
     if args.log_file:
         with open(args.log, 'w') as f:
-            print(f'epoch,train_loss,val_loss\n', file=f)
+            print(f'epoch,lr,train_loss,val_loss\n', file=f)
 
     # Train.
     for epoch in range(args.n_epochs):
@@ -112,9 +116,11 @@ def main(args):
         # Write logs.
         if args.log_file:
             with open(args.log, 'w') as f:
-                print(f'{epoch},{avg_train_loss},{avg_val_loss}\n', file=f)
+                print(f'{epoch},{optimizer.learning_rate},{avg_train_loss},{avg_val_loss}\n', file=f)
 
 
 if __name__ == '__main__':
     args = train_parser()
-    main(args)
+
+    with tf.device(args.device):
+        main(args)
