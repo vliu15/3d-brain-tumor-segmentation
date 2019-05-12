@@ -59,16 +59,17 @@ def main(args):
             x_batch = batch['X']
             y_batch = batch['y']
             if args.data_format == 'channels_last':
-                x_batch = np.reshape(x_batch, (-1, 160, 192, 128, 4))
-                y_batch = np.reshape(y_batch, (-1, 160, 192, 128, 1))
+                x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
             elif args.data_format == 'channels_first':
-                x_batch = np.reshape(x_batch, (-1, 4, 160, 192, 128))
-                y_batch = np.reshape(y_batch, (-1, 1, 160, 192, 128))
+                x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
 
             with tf.GradientTape() as tape:
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_var = model(x_batch)
-                loss = compute_myrnenko_loss(x_batch, y_batch, y_pred, y_vae, z_mean, z_var)
+                loss = compute_myrnenko_loss(
+                            x_batch, y_batch, y_pred, y_vae, z_mean, z_var, data_format=args.data_format)
                 loss += sum(model.losses)
 
             # Gradients and backward.
@@ -83,10 +84,21 @@ def main(args):
         print(f'Training loss: {avg_train_loss}.')
 
         # Validation epoch.
-        for step, (x_batch, y_batch) in tqdm(enumerate(val_data), total=n_val):
+        for step, batch in tqdm(enumerate(val_data), total=n_val):
+            # Read data in from serialized string.
+            x_batch = batch['X']
+            y_batch = batch['y']
+            if args.data_format == 'channels_last':
+                x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
+            elif args.data_format == 'channels_first':
+                x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
+
             # Forward and loss.
             y_pred, y_vae, z_mean, z_var = model(x_batch)
-            loss = compute_myrnenko_loss(x_batch, y_batch, y_pred, y_vae, z_mean, z_var)
+            loss = compute_myrnenko_loss(
+                            x_batch, y_batch, y_pred, y_vae, z_mean, z_var, data_format=args.data_format)
             loss += sum(model.losses)
 
             val_loss.update_state(loss)

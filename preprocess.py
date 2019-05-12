@@ -12,6 +12,7 @@ from tqdm import tqdm
 import tensorflow as tf
 
 from utils.arg_parser import prepro_parser
+from utils.constants import IN_CH
 
 
 def get_npy_image(subject_folder, name):
@@ -58,12 +59,7 @@ def create_dataset(brats_folder, data_format='channels_last'):
         X.append(X_example)
         y.append(y_example)
 
-    if data_format == 'channels_last':
-        n_channels = X[0].shape[-1]
-    elif data_format == 'channels_first':
-        n_channels = X[0].shape[0]
-
-    return X, y, n_channels
+    return X, y
 
 
 def create_splits(X, y):
@@ -176,7 +172,7 @@ def sample_crop(X, y, data_format='channels_last'):
 def main(args):
     # Convert .nii.gz data files to a list Tensors.
     print('Convert data to Numpy arrays.')
-    X_train, y_train, n_channels = create_dataset(args.brats_folder, data_format=args.data_format)
+    X_train, y_train = create_dataset(args.brats_folder, data_format=args.data_format)
 
     # Create dataset splits (if necessary).
     if args.create_val:
@@ -207,12 +203,12 @@ def main(args):
     # Compute shifts and scales for intensification.
     print('Calculate intensity shifts and scales per channel.')
     shifts = np.random.uniform(low=0.0-args.intensity_shift,
-                            high=0.0+args.intensity_shift,
-                            size=(n_channels,))
+                               high=0.0+args.intensity_shift,
+                               size=(IN_CH,))
     shifts = shifts * voxel_std
     scales = np.random.uniform(low=1.0-args.intensity_scale,
-                            high=1.0+args.intensity_scale,
-                            size=(n_channels,))
+                               high=1.0+args.intensity_scale,
+                               size=(IN_CH,))
     print(f'Intensity shifts per channel: {shifts}.')
     print(f'Intensity scales per channel: {scales}.')
 
