@@ -251,7 +251,7 @@ def main(args):
 
         # Write original crop to TFRecord.
         for _ in range(args.n_crops):
-            X_crop, y_crop = sample_crop(X_augment, y_augment, data_format=args.data_format)
+            X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
             example_to_tfrecords(X_crop, y_crop, writer)
 
 
