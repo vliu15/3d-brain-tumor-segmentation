@@ -24,6 +24,6 @@ class ScheduledAdam(tf.keras.optimizers.Adam):
         self.n_epochs = float(n_epochs)
     
     def update_lr(self, epoch_num):
+        """Allows external scheduling per epoch."""
         new_lr = self.init_lr * ((1.0 - epoch_num / self.n_epochs) ** 0.9)
         self._set_hyper('learning_rate', new_lr)
-
