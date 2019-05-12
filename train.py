@@ -68,21 +68,18 @@ def main(args):
                 y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
 
             with tf.GradientTape() as tape:
-                print('forward')
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_var = model(x_batch)
                 loss = compute_myrnenko_loss(
                             x_batch, y_batch, y_pred, y_vae, z_mean, z_var, data_format=args.data_format)
                 loss += sum(model.losses)
 
-            print('backward')
             # Gradients and backward.
             grads = tape.gradient(loss, model.trainable_variables)
             optimizer.update_lr(epoch_num=epoch)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
             train_loss.update_state(loss)
-            print('repeat')
 
         avg_train_loss = train_loss.result() / n_train
         train_loss.reset_states()
