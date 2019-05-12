@@ -1,7 +1,8 @@
 import tensorflow as tf
 
 
-def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var, eps=1e-8):
+def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var,
+                         eps=1e-8, data_format='channels_last'):
     """Returns a Keras-compatible function that computes Myrnenko loss.
     
         Args:
@@ -24,25 +25,31 @@ def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var, eps=1e-8):
             Returns:
                 Myrnenko loss.
         """
-        y_true = tf.contrib.layers.flatten(y_true)
-        y_pred = tf.contrib.layers.flatten(y_pred)
+        axis = -1 if data_format == 'channels_last' else 2
+        y_true = tf.reshape(y_true, [-1])
+        n_channels = y_pred.shape[axis]
+        loss_dice = 0.0
 
-        numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y * y_pred))
-        denom = tf.math.reduce_sum(y ** 2) + tf.math.reduce_sum(y_pred ** 2) + eps
-        loss_dice = numer / denom
+        for channel in range(n_channels):
+            y_pred_ch = tf.reshape(y_pred[..., channel], [-1])
 
-        return loss_dice + 0.1 * loss_L2 + 0.1 * loss_KL
+            numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true * y_pred_ch))
+            denom = tf.math.reduce_sum(y_true ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
+            loss_dice += numer / denom
 
-    N = tf.math.reduce_prod(x.shape)
+        return loss_dice + 0.1 * loss_l2 + 0.1 * loss_kl
 
-    loss_l2 = tf.keras.losses.mse(x, y_vae)
+    N = tf.cast(tf.math.reduce_prod(x.shape), tf.float64)
+
+    loss_l2 = tf.math.reduce_sum((x - y_vae) ** 2)
     loss_kl = tf.math.reduce_sum(
-                z_mean * z_mean + z_var - tf.math.log(z_var) - 1) / N
+                z_mean ** 2 + z_var - tf.math.log(z_var) - 1.0) / N
     
     return myrnenko_loss_fn
 
 
-def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=1e-8):
+def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var,
+                          eps=1e-8, data_format='channels_last'):
     """Computes and returns Myrnenko loss.
     
         Args:
@@ -57,17 +64,22 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=1e-8):
         Returns:
             Myrnenko loss.
     """
-    N = tf.math.reduce_prod(x.shape)
+    N = tf.cast(tf.math.reduce_prod(x.shape), tf.float64)
 
-    loss_l2 = tf.keras.losses.mse(x, y_vae)
+    loss_l2 = tf.math.reduce_sum((x - y_vae) ** 2)
     loss_kl = tf.math.reduce_sum(
-                z_mean * z_mean + z_var - tf.math.log(z_var) - 1) / N
+                z_mean ** 2 + z_var - tf.math.log(z_var) - 1.0) / N
 
-    y_true = tf.contrib.layers.flatten(y_true)
-    y_pred = tf.contrib.layers.flatten(y_pred)
+    axis = -1 if data_format == 'channels_last' else 2
+    y_true = tf.reshape(y_true, [-1])
+    n_channels = y_pred.shape[axis]
+    loss_dice = 0.0
 
-    numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y * y_pred))
-    denom = tf.math.reduce_sum(y ** 2) + tf.math.reduce_sum(y_pred ** 2) + eps
-    loss_dice = numer / denom
+    for channel in range(n_channels):
+        y_pred_ch = tf.reshape(y_pred[..., channel], [-1])
 
-    return loss_dice + 0.1 * loss_L2 + 0.1 * loss_KL
+        numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true * y_pred_ch))
+        denom = tf.math.reduce_sum(y_true ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
+        loss_dice += numer / denom
+
+    return loss_dice + 0.1 * loss_l2 + 0.1 * loss_kl
