@@ -89,7 +89,7 @@ def compute_train_norm(X_train, data_format='channels_last'):
     if data_format == 'channels_last':
         X_train = np.reshape(X_train, newshape=(X_train.shape[-1], -1))
     elif data_format == 'channels_first':
-        X_train = np.reshape(X_train, newshape=(X_train.shape[0], -1))
+        X_train = np.reshape(X_train, newshape=(X_train.shape[1], -1))
 
     # Compute mean and std for each channel
     voxel_mean = np.zeros(X_train.shape[0])
@@ -200,6 +200,14 @@ def main(args):
     if args.create_val:
         X_val = normalize(voxel_mean, voxel_std, X_val, args.shard_size, data_format=args.data_format)
 
+        writer = tf.io.TFRecordWriter('./data/val.tfrecords')
+        for X, y in tqdm(zip(X_val, y_val)):
+            for _ in range(args.n_crops):
+                X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
+                example_to_tfrecords(X_crop, y_crop, writer)
+        del X_val
+        del y_val
+
     # Compute shifts and scales for intensification.
     print('Calculate intensity shifts and scales per channel.')
     shifts = np.random.uniform(low=0.0-args.intensity_shift,
@@ -215,16 +223,6 @@ def main(args):
     # Apply intensity shifts and scales.
     print('Apply per channel intensity shifts and scales.')
     X_train = intensify(shifts, scales, X_train, args.shard_size, data_format=args.data_format)
-    if args.create_val:
-        X_val = intensify(shifts, scales, X_val, args.shard_size, data_format=args.data_format)
-
-        writer = tf.io.TFRecordWriter('./data/val.tfrecords')
-        for X, y in tqdm(zip(X_val, y_val)):
-            for _ in range(args.n_crops):
-                X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
-                example_to_tfrecords(X_crop, y_crop, writer)
-        del X_val
-        del y_val
 
     # Randomly flip for data augmentation.
     print('Randomly augment training data, crop, and save.')
