@@ -63,7 +63,12 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
-                                    kernel_regularizer=kernel_regularizer)] * 2
+                                    kernel_regularizer=kernel_regularizer),
+                              ConvBlock(filters=64,
+                                    kernel_size=kernel_size,
+                                    data_format=data_format,
+                                    groups=groups,
+                                    kernel_regularizer=kernel_regularizer)]
         self.conv_downsamp_64 = tf.keras.layers.Conv3D(
                                     filters=64,
                                     kernel_size=kernel_size,
@@ -77,7 +82,12 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
-                                    kernel_regularizer=kernel_regularizer)] * 2
+                                    kernel_regularizer=kernel_regularizer),
+                               ConvBlock(filters=128,
+                                    kernel_size=kernel_size,
+                                    data_format=data_format,
+                                    groups=groups,
+                                    kernel_regularizer=kernel_regularizer)]
         self.conv_downsamp_128 = tf.keras.layers.Conv3D(
                                     filters=128,
                                     kernel_size=kernel_size,
@@ -91,7 +101,12 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
-                                    kernel_regularizer=kernel_regularizer)] * 4
+                                    kernel_regularizer=kernel_regularizer)] + \
+                              [ConvBlock(filters=256,
+                                    kernel_size=kernel_size,
+                                    data_format=data_format,
+                                    groups=groups,
+                                    kernel_regularizer=kernel_regularizer)] * 3
 
     def call(self, x):
         """Returns the forward pass of the ConvEncoder.
