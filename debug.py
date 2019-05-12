@@ -139,7 +139,7 @@ def main(args):
         _ = test_decoder(enc_outs)
 
     if args.test_vae:
-        enc256 = np.random.randn(1, 20, 24, 16, 256)
+        enc256 = np.random.randn(1, 20, 24, 16, 256).astype(np.float32)
         _ = test_vae(enc256)
 
     if args.test_optimizer:
@@ -155,8 +155,8 @@ def main(args):
         test_loss(x, y_true, y_pred, y_vae, z_mean, z_var)
 
     if args.test_cnn:
-        x = np.random.randn(1, 160, 192, 128, 4)
-        y_true = np.random.randn(1, 160, 192, 128, 1)
+        x = np.random.randn(1, 160, 192, 128, 4).astype(np.float32)
+        y_true = np.random.randn(1, 160, 192, 128, 1).astype(np.float32)
         _ = test_cnn(x, y_true)
 
 

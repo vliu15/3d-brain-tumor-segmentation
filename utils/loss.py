@@ -39,7 +39,7 @@ def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var,
 
         return loss_dice + 0.1 * loss_l2 + 0.1 * loss_kl
 
-    N = tf.cast(tf.math.reduce_prod(x.shape), tf.float64)
+    N = tf.cast(tf.math.reduce_prod(x.shape), tf.float32)
 
     loss_l2 = tf.math.reduce_sum((x - y_vae) ** 2)
     loss_kl = tf.math.reduce_sum(
@@ -64,7 +64,7 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var,
         Returns:
             Myrnenko loss.
     """
-    N = tf.cast(tf.math.reduce_prod(x.shape), tf.float64)
+    N = tf.cast(tf.math.reduce_prod(x.shape), tf.float32)
 
     loss_l2 = tf.math.reduce_sum((x - y_vae) ** 2)
     loss_kl = tf.math.reduce_sum(

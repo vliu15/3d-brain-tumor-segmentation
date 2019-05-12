@@ -6,7 +6,7 @@ from model.layers import ConvBlock
 def sample(latent_args):
     """Samples from the Gaussian given by mean and variance."""
     mean, var = latent_args
-    eps = tf.random.normal(shape=mean.shape, dtype=tf.float64)
+    eps = tf.random.normal(shape=mean.shape, dtype=tf.float32)
     return mean + tf.math.exp(0.5 * var) * eps
 
 
