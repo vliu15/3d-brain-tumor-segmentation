@@ -2,9 +2,9 @@ import tensorflow as tf
 
 from model.encoder import ConvEncoder
 from model.decoder import ConvDecoder
-from model.variational_autoencoder import VariationalAutoEncoder
+from model.variational_autoencoder import VariationalAutoencoder
 
-class VolumetricCNN(tf.keras.Model):
+class VolumetricCNN(tf.keras.models.Model):
     def __init__(self,
                  data_format='channels_last',
                  kernel_size=3,
@@ -24,7 +24,7 @@ class VolumetricCNN(tf.keras.Model):
                                 kernel_size=kernel_size,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer)
-        self.vae = VariationalAutoEncoder(
+        self.vae = VariationalAutoencoder(
                                 data_format=data_format,
                                 kernel_size=kernel_size,
                                 groups=groups,
