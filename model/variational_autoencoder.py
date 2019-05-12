@@ -137,21 +137,21 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 size=2,
                                 data_format=data_format)
 
-        self.conv_block_128 = VariationalAutoEncoderBlock(
+        self.conv_block_128 = VariationalAutoencoderBlock(
                                 filters=128,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer)
 
-        self.conv_block_64 = VariationalAutoEncoderBlock(
+        self.conv_block_64 = VariationalAutoencoderBlock(
                                 filters=64,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer)
 
-        self.conv_block_32 = VariationalAutoEncoderBlock(
+        self.conv_block_32 = VariationalAutoencoderBlock(
                                 filters=32,
                                 data_format=data_format,
                                 groups=groups,
