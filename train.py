@@ -18,7 +18,7 @@ def prepare_dataset(path, batch_size):
     }
 
     dataset = tf.data.TFRecordDataset(path)
-    dataset = dataset.map(parse_example).shuffle(10000).batch(batch_size)
+    dataset = dataset.map(parse_example).batch(batch_size)
 
     return dataset
 
@@ -39,10 +39,13 @@ def main(args):
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
-    n_train = len(train_data)
-    n_val = len(val_data)
 
-    if args.log:
+    # Initial outputs.
+    n_train = tf.data.experimental.cardinality(train_data)
+    n_val = tf.data.experimental.cardinality(val_data)
+    print(f'{n_train} training examples. {n_val} validation examples.')
+
+    if args.log_file:
         with open(args.log, 'w') as f:
             print(f'epoch,train_loss,val_loss\n', file=f)
 
@@ -51,7 +54,17 @@ def main(args):
         print(f'Epoch {epoch}.')
 
         # Training epoch.
-        for step, (x_batch, y_batch) in tqdm(enumerate(train_data)):
+        for step, batch in tqdm(enumerate(train_data), total=n_train):
+            # Read data in from serialized string.
+            x_batch = batch['X']
+            y_batch = batch['y']
+            if args.data_format == 'channels_last':
+                x_batch = np.reshape(x_batch, (-1, 160, 192, 128, 4))
+                y_batch = np.reshape(y_batch, (-1, 160, 192, 128, 1))
+            elif args.data_format == 'channels_first':
+                x_batch = np.reshape(x_batch, (-1, 4, 160, 192, 128))
+                y_batch = np.reshape(y_batch, (-1, 1, 160, 192, 128))
+
             with tf.GradientTape() as tape:
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_var = model(x_batch)
@@ -70,7 +83,7 @@ def main(args):
         print(f'Training loss: {avg_train_loss}.')
 
         # Validation epoch.
-        for step, (x_batch, y_batch) in tqdm(enumerate(val_data)):
+        for step, (x_batch, y_batch) in tqdm(enumerate(val_data), total=n_val):
             # Forward and loss.
             y_pred, y_vae, z_mean, z_var = model(x_batch)
             loss = compute_myrnenko_loss(x_batch, y_batch, y_pred, y_vae, z_mean, z_var)
@@ -83,7 +96,7 @@ def main(args):
         print(f'Validation loss: {avg_val_loss}.')
 
         # Write logs.
-        if args.log:
+        if args.log_file:
             with open(args.log, 'w') as f:
                 print(f'{epoch},{avg_train_loss},{avg_val_loss}\n', file=f)
 
