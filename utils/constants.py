@@ -1,0 +1,12 @@
+"""Contains frequently used constants."""
+
+CHANNELS_FIRST_X_SHAPE     =   (-1, 4, 160, 192, 128)
+CHANNELS_FIRST_Y_SHAPE     =   (-1, 1, 160, 192, 128)
+CHANNELS_LAST_X_SHAPE      =   (-1, 160, 192, 128, 4)
+CHANNELS_LAST_Y_SHAPE      =   (-1, 160, 192, 128, 1)
+
+H        =  160
+W        =  192
+D        =  128
+IN_CH    =  4
+OUT_CH   =  3
