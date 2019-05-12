@@ -3,7 +3,7 @@ We seek to replicate the model that won the BraTS 2018 Segmentation Challenge. T
 
 
 ## Usage
-Dependencies are only supported for Python3 and can be found in `requirements.txt`. We use `numpy==1.15` for the bulk of preprocessing and `tensorflow==2.0.0-alph0` for the model architecture, utilizing `tf.keras.Model` and `tf.keras.Layer` subclassing.
+Dependencies are only supported for Python3 and can be found in `requirements.txt`. We use `numpy==1.15` for the bulk of preprocessing and `tensorflow==2.0.0-alpha0` for the model architecture, utilizing `tf.keras.Model` and `tf.keras.Layer` subclassing.
 
 ### BraTS Data
 The BraTS 2017/2018 dataset is not publiclly available, so we cannot provide download scripts for those. Once downloaded, run preprocessing on the original data format, which should look something like this:
