@@ -24,6 +24,8 @@ def prepro_parser():
             help='Epsilon (from 1.0) of intensity scaling per channel.')
     parser.add_argument('--mirror_prob', type=float, default=0.5,
             help='Probability that each inputs are flipped across all 3 axes.')
+    parser.add_argument('--n_crops', type=int, default=1,
+            help='Number of random crops to sample per image.')
 
     args = parser.parse_args()
 
@@ -67,6 +69,7 @@ def train_parser():
 
     args = parser.parse_args()
 
+    args.device = '/device:GPU:0' if args.gpu else '/cpu:0'
     if not args.use_gpu:
         assert args.data_format == 'channels_last', \
             'tf.keras.layers.Conv3D only supports `channels_last` input for CPU.'

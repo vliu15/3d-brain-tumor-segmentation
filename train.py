@@ -8,18 +8,25 @@ from utils.optimizer import ScheduledAdam
 from model.volumetric_seq2seq import VolumetricSeq2Seq
 
 
-def prepare_data(path, batch_size):
-    data = np.load(path)
-    data = (tf.data.Dataset.from_tensor_slices((data['X'], data['y']))
-                           .shuffle(10000)
-                           .batch(batch_size))
-    return data
+def prepare_dataset(path, batch_size):
+    def parse_example(example_proto):
+        return tf.io.parse_single_example(example_proto, example_desc)
+
+    example_desc = {
+        'X': tf.io.FixedLenFeature([160 * 192 * 128 * 4], tf.float32),
+        'y': tf.io.FixedLenFeature([160 * 192 * 128 * 1], tf.float32)
+    }
+
+    dataset = tf.data.TFRecordDataset(path)
+    dataset = dataset.map(parse_example).shuffle(10000).batch(batch_size)
+
+    return dataset
 
 
 def main(args):
     # Load data.
-    train_data = prepare_data(args.train_loc, args.batch_size)
-    val_data = prepare_data(args.val_loc, args.batch_size)
+    train_data = prepare_dataset(args.train_loc, args.batch_size)
+    val_data = prepare_dataset(args.val_loc, args.batch_size)
 
     # Set up.
     model = VolumetricSeq2Seq(
