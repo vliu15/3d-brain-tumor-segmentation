@@ -146,29 +146,30 @@ def intensify(shifts, scales, X, shard_size, data_format='channels_last'):
 def example_to_tfrecords(X, y, writer):
     """Writes one (X, y) example to tf.TFRecord file."""
     example = {
-        'X': tf.train.Feature(float_list=tf.train.FloatList(value=tf.reshape(X, shape=[-1]))),
-        'y': tf.train.Feature(float_list=tf.train.FloatList(value=tf.reshape(X, shape=[-1])))
+        'X': tf.train.Feature(float_list=tf.train.FloatList(value=X.flatten())),
+        'y': tf.train.Feature(float_list=tf.train.FloatList(value=y.flatten()))
     }
     example = tf.train.Features(feature=example)
-    examplle = tf.train.Example(features=example)
+    example = tf.train.Example(features=example)
     writer.write(example.SerializeToString())
 
 
 def sample_crop(X, y, data_format='channels_last'):
     """Returns the crop of one (X, y) example."""
+    def choose_corner(dim_len, dim_size):
+        return np.random.randint(dim_size, dim_len)
+
+    h = np.random.randint(160, 240)
+    w = np.random.randint(192, 240)
+    d = np.random.randint(128, 155)
+
     if data_format == 'channels_last':
-        size = (160, 192, 128, 5)
-        value = np.concatenate([X, y], axis=-1)
-        value = tf.image.random_crop(value, size)
-        X = value[..., :4]
-        y = value[..., 4]
+        X = X[h-160:h, w-192:w, d-128:d, :]
+        y = y[h-160:h, w-192:w, d-128:d, :]
     elif data_format == 'channels_first':
-        size = (5, 160, 192, 128)
-        value = np.concatenate([X, y], axis=0)
-        value = tf.image.random_crop(value, size)
-        X = value[:4, ...]
-        y = value[4, ...]
-    
+        X = X[:, h-160:h, w-192:w, d-128:d]
+        y = y[:, h-160:h, w-192:w, d-128:d]
+        
     return X, y
 
 
@@ -230,7 +231,7 @@ def main(args):
         del y_val
 
     # Randomly flip for data augmentation.
-    print('Randomly augment training data.')
+    print('Randomly augment training data, crop, and save.')
     writer = tf.io.TFRecordWriter('./data/train.tfrecords')
 
     for X, y in tqdm(zip(X_train, y_train)):
@@ -249,7 +250,7 @@ def main(args):
                 example_to_tfrecords(X_crop, y_crop, writer)
 
         # Write original crop to TFRecord.
-        for _ in range(args.ncrops):
+        for _ in range(args.n_crops):
             X_crop, y_crop = sample_crop(X_augment, y_augment, data_format=args.data_format)
             example_to_tfrecords(X_crop, y_crop, writer)
 
