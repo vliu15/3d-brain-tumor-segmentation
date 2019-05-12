@@ -4,7 +4,6 @@
 """
 import tensorflow as tf
 from tensorflow.keras import initializers, constraints, regularizers
-from tensorflow.keras import backend as K
 
 
 class GroupNormalization(tf.keras.layers.Layer):
@@ -108,8 +107,7 @@ class GroupNormalization(tf.keras.layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        input_shape = K.int_shape(inputs)
-        tensor_input_shape = K.shape(inputs)
+        input_shape = inputs.shape
 
         # Prepare broadcasting shape.
         reduction_axes = list(range(len(input_shape)))
@@ -118,38 +116,37 @@ class GroupNormalization(tf.keras.layers.Layer):
         broadcast_shape[self.axis] = input_shape[self.axis] // self.groups
         broadcast_shape.insert(1, self.groups)
 
-        reshape_group_shape = K.shape(inputs)
+        reshape_group_shape = inputs.shape
         group_axes = [reshape_group_shape[i] for i in range(len(input_shape))]
         group_axes[self.axis] = input_shape[self.axis] // self.groups
         group_axes.insert(1, self.groups)
 
         # Reshape inputs to new group shape.
         group_shape = [group_axes[0], self.groups] + group_axes[2:]
-        group_shape = K.stack(group_shape)
-        inputs = K.reshape(inputs, group_shape)
+        group_shape = tf.stack(group_shape)
+        inputs = tf.reshape(inputs, group_shape)
 
         group_reduction_axes = list(range(len(group_axes)))
         group_reduction_axes = group_reduction_axes[2:]
 
-        mean = K.mean(inputs, axis=group_reduction_axes, keepdims=True)
-        variance = K.var(inputs, axis=group_reduction_axes, keepdims=True)
+        mean, variance = tf.nn.moments(inputs, axes=group_reduction_axes, keepdims=True)
 
-        inputs = (inputs - mean) / (K.sqrt(variance + self.epsilon))
+        inputs = (inputs - mean) / (tf.math.sqrt(variance + self.epsilon))
 
         # Prepare broadcast shape.
-        inputs = K.reshape(inputs, group_shape)
+        inputs = tf.reshape(inputs, group_shape)
         outputs = inputs
 
         # In this case we must explicitly broadcast all parameters.
         if self.scale:
-            broadcast_gamma = K.reshape(self.gamma, broadcast_shape)
+            broadcast_gamma = tf.reshape(self.gamma, broadcast_shape)
             outputs = outputs * broadcast_gamma
 
         if self.center:
-            broadcast_beta = K.reshape(self.beta, broadcast_shape)
+            broadcast_beta = tf.reshape(self.beta, broadcast_shape)
             outputs = outputs + broadcast_beta
 
-        outputs = K.reshape(outputs, tensor_input_shape)
+        outputs = tf.reshape(outputs, input_shape)
 
         return outputs
 
