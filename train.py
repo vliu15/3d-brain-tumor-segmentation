@@ -5,7 +5,7 @@ from tqdm import tqdm
 from utils.arg_parser import train_parser
 from utils.loss import compute_myrnenko_loss
 from utils.optimizer import ScheduledAdam
-from model.volumetric_seq2seq import VolumetricSeq2Seq
+from model.volumetric_cnn import VolumetricCNN
 
 
 def prepare_dataset(path, batch_size):
@@ -29,7 +29,7 @@ def main(args):
     val_data = prepare_dataset(args.val_loc, args.batch_size)
 
     # Set up.
-    model = VolumetricSeq2Seq(
+    model = VolumetricCNN(
                         data_format=args.data_format,
                         kernel_size=args.conv_kernel_size,
                         groups=args.gn_groups,
@@ -53,13 +53,13 @@ def main(args):
         # Training epoch.
         for step, (x_batch, y_batch) in tqdm(enumerate(train_data)):
             with tf.GradientTape() as tape:
+                # Forward and loss.
                 y_pred, y_vae, z_mean, z_var = model(x_batch)
-                
                 loss = compute_myrnenko_loss(x_batch, y_batch, y_pred, y_vae, z_mean, z_var)
                 loss += sum(model.losses)
 
+            # Gradients and backward.
             grads = tape.gradient(loss, model.trainable_variables)
-
             optimizer.update_lr(epoch_num=epoch)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
@@ -71,8 +71,8 @@ def main(args):
 
         # Validation epoch.
         for step, (x_batch, y_batch) in tqdm(enumerate(val_data)):
+            # Forward and loss.
             y_pred, y_vae, z_mean, z_var = model(x_batch)
-
             loss = compute_myrnenko_loss(x_batch, y_batch, y_pred, y_vae, z_mean, z_var)
             loss += sum(model.losses)
 
