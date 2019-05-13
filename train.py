@@ -53,7 +53,7 @@ def main(args):
 
     if args.log_file:
         with open(args.log, 'w') as f:
-            print('epoch,lr,train_loss,val_loss\n', file=f)
+            f.write('epoch,lr,train_loss,val_loss\n')
 
     # Train.
     for epoch in range(args.n_epochs):
@@ -116,8 +116,8 @@ def main(args):
         # Write logs.
         if args.log_file:
             with open(args.log, 'w') as f:
-                print('{},{},{},{}\n'.format(
-                        epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss), file=f)
+                f.write('{},{},{},{}\n'.format(
+                        epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss))
 
 
 if __name__ == '__main__':
