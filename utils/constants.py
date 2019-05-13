@@ -10,15 +10,15 @@ CHANNELS_FIRST_Y_SHAPE     =   (-1, 1, 160, 192, 128)
 CHANNELS_LAST_X_SHAPE      =   (-1, 160, 192, 128, 4)
 CHANNELS_LAST_Y_SHAPE      =   (-1, 160, 192, 128, 1)
 
-RAW_H    =  240         # Height of raw image.
-RAW_W    =  240         # Width of raw image.
-RAW_D    =  155         # Depth of raw image.
-H        =  160         # Target height of preprocessed image.
-W        =  192         # Target width of preprocessed image.
-D        =  128         # Target depth of preprocessed image.
+RAW_H    =  240                     # Height of raw image.
+RAW_W    =  240                     # Width of raw image.
+RAW_D    =  155                     # Depth of raw image.
+H        =  160                     # Target height of preprocessed image.
+W        =  192                     # Target width of preprocessed image.
+D        =  128                     # Target depth of preprocessed image.
 
-IN_CH    =  4           # Number of input channels.
-OUT_CH   =  3           # Number of output channels.
+IN_CH    =  len(ALL_MODALITIES)     # Number of input channels.
+OUT_CH   =  3                       # Number of output channels.
 
 
 # Encoder.
