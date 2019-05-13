@@ -48,16 +48,16 @@ def main(args):
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
 
-    print(f'{n_train} training examples.')
-    print(f'{n_val} validation examples.')
+    print('{} training examples.'.format(n_train))
+    print('{} validation examples.'.format(n_val))
 
     if args.log_file:
         with open(args.log, 'w') as f:
-            print(f'epoch,lr,train_loss,val_loss\n', file=f)
+            print('epoch,lr,train_loss,val_loss\n', file=f)
 
     # Train.
     for epoch in range(args.n_epochs):
-        print(f'Epoch {epoch}.')
+        print('Epoch {}.'.format(epoch))
 
         # Training epoch.
         for step, batch in tqdm(enumerate(train_data), total=n_train):
@@ -87,7 +87,7 @@ def main(args):
 
         avg_train_loss = train_loss.result() / n_train
         train_loss.reset_states()
-        print(f'Training loss: {avg_train_loss}.')
+        print('Training loss: {}.'.format(avg_train_loss))
 
         # Validation epoch.
         for step, batch in tqdm(enumerate(val_data), total=n_val):
@@ -111,12 +111,13 @@ def main(args):
 
         avg_val_loss = val_loss.result() / n_val
         val_loss.reset_states()
-        print(f'Validation loss: {avg_val_loss}.')
+        print('Validation loss: {}.'.format(avg_val_loss))
 
         # Write logs.
         if args.log_file:
             with open(args.log, 'w') as f:
-                print(f'{epoch},{optimizer.learning_rate},{avg_train_loss},{avg_val_loss}\n', file=f)
+                print('{},{},{},{}\n'.format(
+                        epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss), file=f)
 
 
 if __name__ == '__main__':

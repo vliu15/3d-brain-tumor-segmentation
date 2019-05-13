@@ -175,21 +175,21 @@ def main(args):
     if args.create_val:
         print('Create train / val splits.')
         X_train, y_train, X_val, y_val = create_splits(X_train, y_train)
-        print(f'X_train shape: {X_train.shape}.')
-        print(f'y_train shape: {y_train.shape}.')
-        print(f'X_val shape: {X_val.shape}.')
-        print(f'y_val shape: {y_val.shape}.')
+        print('X_train shape: {}.'.format(X_train.shape))
+        print('y_train shape: {}.'.format(y_train.shape))
+        print('X_val shape: {}.'.format(X_val.shape))
+        print('y_val shape: {}.'.format(y_val.shape))
     else:
         X_train = np.stack(X_train, axis=0)
         y_train = np.stack(y_train, axis=0)
-        print(f'X_train shape: {X_train.shape}.')
-        print(f'y_train shape: {y_train.shape}.')
+        print('X_train shape: {}.'.format(X_train.shape))
+        print('y_train shape: {}.'.format(y_train.shape))
 
     # Compute mean and std for normalization.
     print('Calculate voxel-wise mean and std per channel of training set.')
     voxel_mean, voxel_std = compute_train_norm(X_train, data_format=args.data_format)
-    print(f'Voxel-wise mean per channel: {voxel_mean}.')
-    print(f'Voxel-wise std per channel: {voxel_std}.')
+    print('Voxel-wise mean per channel: {}.'.format(voxel_mean))
+    print('Voxel-wise std per channel: {}.'.format(voxel_std))
 
     # Normalize training and validation data.
     print('Apply per channel normalization.')
@@ -214,8 +214,8 @@ def main(args):
     scales = np.random.uniform(low=1.0-args.intensity_scale,
                                high=1.0+args.intensity_scale,
                                size=(IN_CH,))
-    print(f'Intensity shifts per channel: {shifts}.')
-    print(f'Intensity scales per channel: {scales}.')
+    print('Intensity shifts per channel: {}.'.format(shifts))
+    print('Intensity scales per channel: {}.'.format(scales))
 
     # Apply intensity shifts and scales.
     print('Apply per channel intensity shifts and scales.')

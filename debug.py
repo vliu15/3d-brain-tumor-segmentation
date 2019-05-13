@@ -28,7 +28,7 @@ def test_encoder(x):
     print('All encoder output shapes match.')
 
     params = sum(tf.reduce_prod(var.shape) for var in encoder.trainable_variables)
-    print(f'Number of trainable parameters: {params}.')
+    print('Number of trainable parameters: {}.'.format(params))
 
     return (conv_out_32, conv_out_64, conv_out_128, encoder_out)
 
@@ -47,7 +47,7 @@ def test_decoder(enc_outs):
     print('Decoder output shape matches.')
 
     params = sum(tf.reduce_prod(var.shape) for var in decoder.trainable_variables)
-    print(f'Number of trainable parameters: {params}.')
+    print('Number of trainable parameters: {}.'.format(params))
 
     return logits
 
@@ -67,7 +67,7 @@ def test_vae(enc_256):
     print('All vae output shapes match.')
 
     params = sum(tf.reduce_prod(var.shape) for var in vae.trainable_variables)
-    print(f'Number of trainable parameters: {params}.')
+    print('Number of trainable parameters: {}.'.format(params))
 
     return (y_vae, z_mean, z_var)
 
@@ -97,8 +97,8 @@ def test_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=1e-8):
     assert functional_loss.shape == ()
     assert keras_loss.shape == ()
 
-    print(f'Functional loss: {functional_loss}.')
-    print(f'Keras-style loss: {keras_loss}.')
+    print('Functional loss: {}.'.format(functional_loss))
+    print('Keras-style loss: {}.'.format(keras_loss))
 
 
 def test_cnn(x, y_true):
@@ -116,10 +116,10 @@ def test_cnn(x, y_true):
     print('Model output shapes match model input shape.')
 
     params = sum(tf.reduce_prod(var.shape) for var in cnn.trainable_variables)
-    print(f'Number of trainable parameters: {params}.')
+    print('Number of trainable parameters: {}.'.format(params))
 
     loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=1e-8)
-    print(f'Loss: {loss}.')
+    print('Loss: {}.'.format(loss))
 
     return y_hat, y_vae, z_mean, z_var
 
