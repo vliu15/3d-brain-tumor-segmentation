@@ -5,6 +5,9 @@ CHANNELS_FIRST_Y_SHAPE     =   (-1, 1, 160, 192, 128)
 CHANNELS_LAST_X_SHAPE      =   (-1, 160, 192, 128, 4)
 CHANNELS_LAST_Y_SHAPE      =   (-1, 160, 192, 128, 1)
 
+RAW_H    =  240
+RAW_W    =  240
+RAW_D    =  155
 H        =  160
 W        =  192
 D        =  128

@@ -12,7 +12,7 @@ from tqdm import tqdm
 import tensorflow as tf
 
 from utils.arg_parser import prepro_parser
-from utils.constants import IN_CH
+from utils.constants import *
 
 
 def get_npy_image(subject_folder, name):
@@ -87,13 +87,13 @@ def create_splits(X, y):
 def compute_train_norm(X_train, data_format='channels_last'):
     """Returns mean and standard deviation per channel for training inputs."""
     if data_format == 'channels_last':
-        X_train = np.reshape(X_train, newshape=(X_train.shape[-1], -1))
+        X_train = X_train.transpose(4, 0, 1, 2, 3).reshape(IN_CH, -1)
     elif data_format == 'channels_first':
-        X_train = np.reshape(X_train, newshape=(X_train.shape[1], -1))
+        X_train = X_train.transpose(1, 0, 2, 3, 4).reshape(IN_CH, -1)
 
     # Compute mean and std for each channel
-    voxel_mean = np.zeros(X_train.shape[0])
-    voxel_std = np.zeros(X_train.shape[0])
+    voxel_mean = np.zeros(IN_CH)
+    voxel_std = np.zeros(IN_CH)
     for i, channel in tqdm(enumerate(X_train), leave=False):
         voxel_mean[i] = np.mean(channel[channel != 0])
         voxel_std[i] = np.std(channel[channel != 0])
@@ -105,11 +105,11 @@ def normalize(voxel_mean, voxel_std, X, shard_size, data_format='channels_last')
     """Normalizes an array of features X given voxel-wise mean and std."""
     # Reshape mean and std into broadcastable with X, then loop per channel to avoid OOM.
     if data_format == 'channels_last':
-        voxel_mean = np.reshape(voxel_mean, newshape=(1, 1, 1, 1, voxel_mean.shape[-1]))
-        voxel_std = np.reshape(voxel_std, newshape=(1, 1, 1, 1, voxel_std.shape[-1]))
+        voxel_mean = voxel_mean.reshape(1, 1, 1, 1, IN_CH)
+        voxel_std = voxel_std.reshape(1, 1, 1, 1, IN_CH)
     elif data_format == 'channels_first':
-        voxel_mean = np.reshape(voxel_mean, newshape=(1, voxel_mean.shape[-1], 1, 1, 1))
-        voxel_std = np.reshape(voxel_std, newshape=(1, voxel_std.shape[-1], 1, 1, 1))
+        voxel_mean = voxel_mean.reshape(1, IN_CH, 1, 1, 1)
+        voxel_std = voxel_std.reshape(1, IN_CH, 1, 1, 1)
 
     num_shards = X.shape[0] // shard_size + 1
     for shard in tqdm(range(num_shards)):
@@ -124,11 +124,11 @@ def intensify(shifts, scales, X, shard_size, data_format='channels_last'):
     """Applies intensity shifting and scaling on X given shift and scale values."""
     # Reshape shifts and scales into broadcastable with X, then loop per channel to avoid OOM.
     if data_format == 'channels_last':
-        shifts = np.reshape(shifts, newshape=(1, 1, 1, 1, shifts.shape[-1]))
-        scales = np.reshape(scales, newshape=(1, 1, 1, 1, scales.shape[-1]))
+        shifts = shifts.reshape(1, 1, 1, 1, IN_CH)
+        scales = scales.reshape(1, 1, 1, 1, IN_CH)
     elif data_format == 'channels_first':
-        shifts = np.reshape(shifts, newshape=(1, shifts.shape[-1], 1, 1, 1))
-        scales = np.reshape(scales, newshape=(1, scales.shape[-1], 1, 1, 1))
+        shifts = shifts.reshape(1, IN_CH, 1, 1, 1)
+        scales = scales.reshape(1, IN_CH, 1, 1, 1)
 
     num_shards = X.shape[0] // shard_size + 1
     for shard in tqdm(range(num_shards)):
@@ -155,16 +155,16 @@ def sample_crop(X, y, data_format='channels_last'):
     def choose_corner(dim_len, dim_size):
         return np.random.randint(dim_size, dim_len)
 
-    h = np.random.randint(160, 240)
-    w = np.random.randint(192, 240)
-    d = np.random.randint(128, 155)
+    h = np.random.randint(H, RAW_H)
+    w = np.random.randint(W, RAW_W)
+    d = np.random.randint(D, RAW_D)
 
     if data_format == 'channels_last':
-        X = X[h-160:h, w-192:w, d-128:d, :]
-        y = y[h-160:h, w-192:w, d-128:d, :]
+        X = X[h-H:h, w-W:w, d-D:d, :]
+        y = y[h-H:h, w-W:w, d-D:d, :]
     elif data_format == 'channels_first':
-        X = X[:, h-160:h, w-192:w, d-128:d]
-        y = y[:, h-160:h, w-192:w, d-128:d]
+        X = X[:, h-H:h, w-W:w, d-D:d]
+        y = y[:, h-H:h, w-W:w, d-D:d]
         
     return X, y
 
