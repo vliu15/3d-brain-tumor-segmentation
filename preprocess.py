@@ -37,9 +37,6 @@ def create_dataset(brats_folder, data_format='channels_last'):
                 if data_format == 'channels_first': shape=(1, 240, 240, 155)
                 if data_format == 'channels_last': shape=(240, 240, 155, 1)
     """
-    ALL_MODALITIES = ['t1', 't1ce', 'flair', 't2']
-    TRUTH = 'seg'
-
     X = []
     y = []
     # Loop through each folder with `.nii.gz` files.

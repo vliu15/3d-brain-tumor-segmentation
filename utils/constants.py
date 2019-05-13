@@ -1,5 +1,8 @@
 """Contains frequently used constants."""
 
+ALL_MODALITIES = ['t1', 't1ce', 'flair', 't2']
+TRUTH = 'seg'
+
 CHANNELS_FIRST_X_SHAPE     =   (-1, 4, 160, 192, 128)
 CHANNELS_FIRST_Y_SHAPE     =   (-1, 1, 160, 192, 128)
 CHANNELS_LAST_X_SHAPE      =   (-1, 160, 192, 128, 4)
