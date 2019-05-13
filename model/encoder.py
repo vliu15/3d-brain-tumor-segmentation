@@ -1,6 +1,7 @@
 import tensorflow as tf
 
 from model.layers import ConvBlock
+from utils.constants import *
 
 
 class ConvEncoder(tf.keras.layers.Layer):
@@ -36,7 +37,7 @@ class ConvEncoder(tf.keras.layers.Layer):
         super(ConvEncoder, self).__init__()
         # Input layers.
         self.inp_conv = tf.keras.layers.Conv3D(
-                                filters=32,
+                                filters=ENC_CONV_LAYER_SIZE,
                                 kernel_size=kernel_size,
                                 strides=1,
                                 padding='same',
@@ -45,13 +46,13 @@ class ConvEncoder(tf.keras.layers.Layer):
         self.inp_dropout = tf.keras.layers.Dropout(dropout)
 
         # First ConvBlock: filters=32, x1.
-        self.conv_block_32 = [ConvBlock(filters=32,
+        self.conv_block_0 = [ConvBlock(filters=ENC_CONV_BLOCK0_SIZE,
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
-                                    kernel_regularizer=kernel_regularizer)]
-        self.conv_downsamp_32 = tf.keras.layers.Conv3D(
-                                    filters=32,
+                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK0_NUM)]
+        self.conv_downsamp_0 = tf.keras.layers.Conv3D(
+                                    filters=ENC_CONV_BLOCK0_SIZE,
                                     kernel_size=kernel_size,
                                     strides=2,
                                     padding='same',
@@ -59,13 +60,13 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer)
 
         # Second ConvBlock: filters=64, x2.
-        self.conv_block_64 = [ConvBlock(filters=64,
+        self.conv_block_1 = [ConvBlock(filters=ENC_CONV_BLOCK1_SIZE,
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
-                                    kernel_regularizer=kernel_regularizer) for _ in range(2)]
-        self.conv_downsamp_64 = tf.keras.layers.Conv3D(
-                                    filters=64,
+                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK1_NUM)]
+        self.conv_downsamp_1 = tf.keras.layers.Conv3D(
+                                    filters=ENC_CONV_BLOCK1_SIZE,
                                     kernel_size=kernel_size,
                                     strides=2,
                                     padding='same',
@@ -73,13 +74,13 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer)
 
         # Third ConvBlock: filters=128, x2.
-        self.conv_block_128 = [ConvBlock(filters=128,
+        self.conv_block_2 = [ConvBlock(filters=ENC_CONV_BLOCK2_SIZE,
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
-                                    kernel_regularizer=kernel_regularizer) for _ in range(2)]
-        self.conv_downsamp_128 = tf.keras.layers.Conv3D(
-                                    filters=128,
+                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK2_NUM)]
+        self.conv_downsamp_2 = tf.keras.layers.Conv3D(
+                                    filters=ENC_CONV_BLOCK2_SIZE,
                                     kernel_size=kernel_size,
                                     strides=2,
                                     padding='same',
@@ -87,11 +88,11 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer)
 
         # Fourth ConvBlock: filters=256, x4.
-        self.conv_block_256 = [ConvBlock(filters=256,
+        self.conv_block_3 = [ConvBlock(filters=ENC_CONV_BLOCK3_SIZE,
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
-                                    kernel_regularizer=kernel_regularizer) for _ in range(4)]
+                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
     def call(self, x):
         """Returns the forward pass of the ConvEncoder.
@@ -121,27 +122,27 @@ class ConvEncoder(tf.keras.layers.Layer):
         x = self.inp_dropout(x)
 
         # First ConvBlock: filters=32, x1.
-        for conv in self.conv_block_32:
+        for conv in self.conv_block_0:
             x = conv(x)
-        conv_out_32 = x
-        x = self.conv_downsamp_32(x)
+        conv_out_0 = x
+        x = self.conv_downsamp_0(x)
 
         # Second ConvBlock: filters=64, x2.
-        for conv in self.conv_block_64:
+        for conv in self.conv_block_1:
             x = conv(x)
-        conv_out_64 = x
-        x = self.conv_downsamp_64(x)
+        conv_out_1 = x
+        x = self.conv_downsamp_1(x)
 
         # Third ConvBlock: filters=128. x2.
-        for conv in self.conv_block_128:
+        for conv in self.conv_block_2:
             x = conv(x)
-        conv_out_128 = x
-        x = self.conv_downsamp_128(x)
+        conv_out_2 = x
+        x = self.conv_downsamp_2(x)
 
         # Fourth ConvBlock: filters=256, x4.
-        for conv in self.conv_block_256:
+        for conv in self.conv_block_3:
             x = conv(x)
         encoder_out = x
 
         # Return values after each ConvBlock for residuals later.
-        return conv_out_32, conv_out_64, conv_out_128, encoder_out
+        return conv_out_0, conv_out_1, conv_out_2, encoder_out

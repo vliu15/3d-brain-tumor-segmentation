@@ -1,6 +1,8 @@
 import tensorflow as tf
+
 from model.group_norm import GroupNormalization
 from model.layers import ConvBlock
+from utils.constants import *
 
 
 def sample(latent_args):
@@ -103,31 +105,31 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         super(VariationalAutoencoder, self).__init__(name='variational_autoencoder')
 
         # VD Block
-        self.groupnorm_256 = GroupNormalization(
+        self.groupnorm_VD = GroupNormalization(
                                 groups=groups,
                                 axis=-1 if data_format == 'channels_last' else 1)
-        self.relu_256 = tf.keras.layers.Activation('relu')
-        self.conv3d_256 = tf.keras.layers.Conv3D(
-                                filters=16,
+        self.relu_VD = tf.keras.layers.Activation('relu')
+        self.conv3d_VD = tf.keras.layers.Conv3D(
+                                filters=VAE_VD_CONV_SIZE,
                                 kernel_size=kernel_size,
                                 strides=2,
                                 padding='same',
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer)
-        self.flatten_256 = tf.keras.layers.Flatten(data_format)
-        self.proj_256 = tf.keras.layers.Dense(256)
+        self.flatten_VD = tf.keras.layers.Flatten(data_format)
+        self.proj_VD = tf.keras.layers.Dense(VAE_VD_BLOCK_SIZE)
 
         # VDraw Block
-        self.mean = tf.keras.layers.Dense(128)
-        self.var = tf.keras.layers.Dense(128)
+        self.mean = tf.keras.layers.Dense(VAE_VD_BLOCK_SIZE / 2)
+        self.var = tf.keras.layers.Dense(VAE_VD_BLOCK_SIZE / 2)
         self.sample = tf.keras.layers.Lambda(sample)
 
         # VU Block
         self.proj_VU = tf.keras.layers.Dense(10*12*8*1)
         self.relu_VU = tf.keras.layers.Activation('relu')
-        self.reshape = tf.keras.layers.Reshape((10, 12, 8, 1))
+        self.reshape_VU = tf.keras.layers.Reshape((10, 12, 8, 1))
         self.conv1d_VU = tf.keras.layers.Conv3D(
-                                filters=256,
+                                filters=VAE_VU_BLOCK_SIZE,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
@@ -137,29 +139,29 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 size=2,
                                 data_format=data_format)
 
-        self.conv_block_128 = VariationalAutoencoderBlock(
-                                filters=128,
+        self.conv_block_2 = VariationalAutoencoderBlock(
+                                filters=VAE_CONV_BLOCK2_SIZE,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer)
 
-        self.conv_block_64 = VariationalAutoencoderBlock(
-                                filters=64,
+        self.conv_block_1 = VariationalAutoencoderBlock(
+                                filters=VAE_CONV_BLOCK1_SIZE,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer)
 
-        self.conv_block_32 = VariationalAutoencoderBlock(
-                                filters=32,
+        self.conv_block_0 = VariationalAutoencoderBlock(
+                                filters=VAE_CONV_BLOCK0_SIZE,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer)
 
-        self.conv_4 = tf.keras.layers.Conv3D(
-                                filters=4,
+        self.conv_out = tf.keras.layers.Conv3D(
+                                filters=IN_CH,
                                 kernel_size=kernel_size,
                                 strides=1,
                                 padding='same',
@@ -178,37 +180,35 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
             }
         """
         # VD Block
-        x = self.groupnorm_256(x)
-        x = self.relu_256(x)
-        x = self.conv3d_256(x)
-        x = self.flatten_256(x)
-        x = self.proj_256(x)
+        x = self.groupnorm_VD(x)
+        x = self.relu_VD(x)
+        x = self.conv3d_VD(x)
+        x = self.flatten_VD(x)
+        x = self.proj_VD(x)
 
         # VDraw Block
-        mu = self.mean(x)
-        z_mean = mu
-        sigma = self.var(x)
-        z_var = sigma
-        x = self.sample([mu, sigma])
+        z_mean = self.mean(x)
+        z_var = self.var(x)
+        x = self.sample([z_mean, z_var])
 
         # VU Block
         x = self.proj_VU(x)
         x = self.relu_VU(x)
-        x = self.reshape(x)
+        x = self.reshape_VU(x)
         x = self.conv1d_VU(x)
         x = self.conv3d_upsample_VU(x)
 
         # VUp2 and VBlock2
-        x = self.conv_block_128(x)
+        x = self.conv_block_2(x)
 
         # VUp1 and VBlock1
-        x = self.conv_block_64(x)
+        x = self.conv_block_1(x)
 
         # VUp0 and VBlock0
-        x = self.conv_block_32(x)
+        x = self.conv_block_0(x)
 
         # Vend
-        x = self.conv_4(x)
+        x = self.conv_out(x)
 
         y_vae = x
 

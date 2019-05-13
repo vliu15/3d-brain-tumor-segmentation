@@ -1,6 +1,7 @@
 import tensorflow as tf
 
 from model.layers import ConvBlock
+from utils.constants import *
 
 
 class DecoderBlock(tf.keras.layers.Layer):
@@ -93,27 +94,27 @@ class ConvDecoder(tf.keras.layers.Layer):
                     8, as used in the paper.
         """
         super(ConvDecoder, self).__init__()
-        self.dec_block_128 = DecoderBlock(
-                                filters=128,
+        self.dec_block_2 = DecoderBlock(
+                                filters=DEC_CONV_BLOCK2_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer)
-        self.dec_block_64 = DecoderBlock(
-                                filters=64,
+        self.dec_block_1 = DecoderBlock(
+                                filters=DEC_CONV_BLOCK1_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer)
-        self.dec_block_32 = DecoderBlock(
-                                filters=32,
+        self.dec_block_0 = DecoderBlock(
+                                filters=DEC_CONV_BLOCK0_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer)
 
-        self.out_conv = tf.keras.layers.Conv3D(
-                                filters=32,
+        self.conv_out = tf.keras.layers.Conv3D(
+                                filters=DEC_CONV_LAYER_SIZE,
                                 kernel_size=kernel_size,
                                 strides=1,
                                 padding='same',
@@ -121,7 +122,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 kernel_regularizer=kernel_regularizer)
 
         self.ptwise_logits = tf.keras.layers.Conv3D(
-                                filters=3,
+                                filters=OUT_CH,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
@@ -148,13 +149,13 @@ class ConvDecoder(tf.keras.layers.Layer):
                     Output 'image' the same size as the original input image
                     to the encoder, but with 3 channels.
         """
-        enc_out_32, enc_out_64, enc_out_128, x = enc_outs
+        enc_out_0, enc_out_1, enc_out_2, x = enc_outs
 
-        x = self.dec_block_128(x, enc_out_128)
-        x = self.dec_block_64(x, enc_out_64)
-        x = self.dec_block_32(x, enc_out_32)
+        x = self.dec_block_2(x, enc_out_2)
+        x = self.dec_block_1(x, enc_out_1)
+        x = self.dec_block_0(x, enc_out_0)
 
-        x = self.out_conv(x)
+        x = self.conv_out(x)
         x = self.ptwise_logits(x)
 
         return x
