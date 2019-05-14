@@ -96,13 +96,13 @@ class ConvBlock(tf.keras.layers.Layer):
                                 filters=filters,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
-                                groups=8,
+                                groups=groups,
                                 kernel_regularizer=kernel_regularizer)
         self.conv_layer2 = ConvLayer(
                                 filters=filters,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
-                                groups=8,
+                                groups=groups,
                                 kernel_regularizer=kernel_regularizer)
         self.residual = tf.keras.layers.Add()
 
