@@ -59,19 +59,19 @@ def main(args):
     for epoch in range(args.n_epochs):
         print('Epoch {}.'.format(epoch))
 
-        with tf.device(args.device):
-            # Training epoch.
-            for step, batch in tqdm(enumerate(train_data), total=n_train):
-                # Read data in from serialized string.
-                x_batch = batch['X']
-                y_batch = batch['y']
-                if args.data_format == 'channels_last':
-                    x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
-                    y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
-                elif args.data_format == 'channels_first':
-                    x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
-                    y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
+        # Training epoch.
+        for step, batch in tqdm(enumerate(train_data), total=n_train):
+            # Read data in from serialized string.
+            x_batch = batch['X']
+            y_batch = batch['y']
+            if args.data_format == 'channels_last':
+                x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
+            elif args.data_format == 'channels_first':
+                x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
 
+            with tf.device(args.device):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
                     y_pred, y_vae, z_mean, z_var = model(x_batch)
@@ -86,22 +86,23 @@ def main(args):
 
                 train_loss.update_state(loss)
 
-            avg_train_loss = train_loss.result() / n_train
-            train_loss.reset_states()
-            print('Training loss: {}.'.format(avg_train_loss))
+        avg_train_loss = train_loss.result() / n_train
+        train_loss.reset_states()
+        print('Training loss: {}.'.format(avg_train_loss))
 
-            # Validation epoch.
-            for step, batch in tqdm(enumerate(val_data), total=n_val):
-                # Read data in from serialized string.
-                x_batch = batch['X']
-                y_batch = batch['y']
-                if args.data_format == 'channels_last':
-                    x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
-                    y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
-                elif args.data_format == 'channels_first':
-                    x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
-                    y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
+        # Validation epoch.
+        for step, batch in tqdm(enumerate(val_data), total=n_val):
+            # Read data in from serialized string.
+            x_batch = batch['X']
+            y_batch = batch['y']
+            if args.data_format == 'channels_last':
+                x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
+            elif args.data_format == 'channels_first':
+                x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
 
+            with tf.device(args.device):
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_var = model(x_batch)
                 loss = compute_myrnenko_loss(
@@ -110,15 +111,15 @@ def main(args):
 
                 val_loss.update_state(loss)
 
-            avg_val_loss = val_loss.result() / n_val
-            val_loss.reset_states()
-            print('Validation loss: {}.'.format(avg_val_loss))
+        avg_val_loss = val_loss.result() / n_val
+        val_loss.reset_states()
+        print('Validation loss: {}.'.format(avg_val_loss))
 
-            # Write logs.
-            if args.log_file:
-                with open(args.log, 'w') as f:
-                    f.write('{},{},{},{}\n'.format(
-                            epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss))
+        # Write logs.
+        if args.log_file:
+            with open(args.log, 'w') as f:
+                f.write('{},{},{},{}\n'.format(
+                        epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss))
 
 
 if __name__ == '__main__':
