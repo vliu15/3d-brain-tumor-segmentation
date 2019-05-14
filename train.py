@@ -71,6 +71,8 @@ def main(args):
                 x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
                 y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
 
+            optimizer.update_lr(epoch_num=epoch)
+
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
@@ -81,7 +83,6 @@ def main(args):
 
                 # Gradients and backward.
                 grads = tape.gradient(loss, model.trainable_variables)
-                optimizer.update_lr(epoch_num=epoch)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 train_loss.update_state(loss)
