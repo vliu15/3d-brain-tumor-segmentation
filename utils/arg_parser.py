@@ -57,6 +57,8 @@ def train_parser():
             help='Batch size to be used in training.')
     parser.add_argument('--log_file', type=str, default='',
             help='File for output logs.')
+    parser.add_argument('--log_steps', type=int, default=100,
+            help='Number of steps to output progress.')
 
     # Model.
     parser.add_argument('--conv_kernel_size', type=int, default=3,

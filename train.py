@@ -60,7 +60,7 @@ def main(args):
         print('Epoch {}.'.format(epoch))
 
         # Training epoch.
-        for step, batch in tqdm(enumerate(train_data), total=n_train):
+        for step, batch in tqdm(enumerate(train_data, 1), total=n_train):
             # Read data in from serialized string.
             x_batch = batch['X']
             y_batch = batch['y']
@@ -86,6 +86,9 @@ def main(args):
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 train_loss.update_state(loss)
+
+            if args.log_steps % step == 0:
+                print('Step {}. Loss: {}.'.format(step, loss))
 
         avg_train_loss = train_loss.result() / n_train
         train_loss.reset_states()
