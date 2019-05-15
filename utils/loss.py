@@ -29,7 +29,7 @@ def generalized_dice_loss(y_true, y_pred, data_format='channels_last', eps=1e-8)
                 or `channels_first`.
 
         Returns:
-            generalized dice loss.
+            Generalized dice loss.
     """
     # Expand channels to correspond to per class.
     y_true = tf.broadcast_to(y_true, shape=y_pred.shape)
@@ -81,7 +81,7 @@ def sensitivity_specificity_loss(y_true, y_pred, lamb=0.05,
             eps: small float to avoid division by 0.
 
         Returns:
-            weighted sensitivity-specificity loss.
+            Weighted sensitivity-specificity (SS) loss.
     """
     # Expand channels to correspond to per class.
     y_true = tf.broadcast_to(y_true, shape=y_pred.shape)
@@ -132,6 +132,8 @@ def myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
             z_mean: mean of sampling distribution.
             z_logvar: log variance of sampilng distribution.
             eps: small float to avoid division by 0.
+            data_format: whether data is in the format `channels_last`
+                or `channels_first`.
 
         Returns:
             Myrnenko loss.
@@ -141,3 +143,32 @@ def myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
     return 0.1 * l2_loss(x, y_vae) + \
            0.1 * kullbach_liebler_loss(z_mean, z_logvar, n_voxels) + \
            generalized_dice_loss(y_true, y_pred, data_format=data_format)
+
+
+def tunable_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
+                        eps=1e-8, lamb=0.05, data_format='channels_last'):
+    """Computes and returns a custom weighted loss function.
+    
+        Args:
+            x: input to the model.
+            y_true: labeled output.
+            y_pred: predicted model output.
+            y_vae: output from VAE branch.
+            z_mean: mean of sampling distribution.
+            z_logvar: log variance of sampilng distribution.
+            lamb: weight of sensitivity in SS loss.
+            eps: small float to avoid division by 0.
+            data_format: whether data is in the format `channels_last`
+                or `channels_first`.
+
+        Returns:
+            Custom weighted loss.
+    """
+    n_voxels = tf.cast(tf.math.reduce_prod(x.shape), tf.float32)
+
+    return GDL_WEIGHT * generalized_dice_loss(
+                            y_true, y_pred, data_format=data_format) + \
+           SS_WEIGHT * sensitivity_specificity_loss(
+                            y_true, y_pred, lamb=lamb, data_format=data_format) + \
+           KL_WEIGHT * kullbach_liebler_loss(z_mean, z_logvar, n_voxels) + \
+           L2_WEIGHT * l2_loss(x, y_vae)
