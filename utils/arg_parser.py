@@ -18,6 +18,8 @@ def prepro_parser():
     # Specifics.
     parser.add_argument('--create_val', action='store_true', default=False,
             help='Whether to create validation split from training data.')
+    parser.add_argument('--intensify', action='store_true', default=False,
+            help='Whether to perform intensity shift after normalization.')
     parser.add_argument('--intensity_shift', type=float, default=0.1,
             help='Scale of intensity shift to apply per channel after normalization.')
     parser.add_argument('--intensity_scale', type=float, default=0.1,
