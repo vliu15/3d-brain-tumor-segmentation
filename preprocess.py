@@ -169,76 +169,81 @@ def sample_crop(X, y, data_format='channels_last'):
 def main(args):
     # Convert .nii.gz data files to a list Tensors.
     print('Convert data to Numpy arrays.')
-    X, y = create_dataset(args.brats_folder, data_format=args.data_format)
+    X_train, y_train = create_dataset(args.brats_folder, data_format=args.data_format)
 
-    X = np.stack(X, axis=0)
-    y = np.stack(y, axis=0)
-    print('X shape: {}.'.format(X.shape))
-    print('y shape: {}.'.format(y.shape))
-
-    if args.train:
-        # Compute mean and std for normalization.
-        print('Calculate voxel-wise mean and std per channel of training set.')
-        voxel_mean, voxel_std = compute_train_norm(X, data_format=args.data_format)
-        np.save('./data/train_params.npy', {'mean': voxel_mean, 'std': voxel_std})
+    # Create dataset splits (if necessary).
+    if args.create_val:
+        print('Create train / val splits.')
+        X_train, y_train, X_val, y_val = create_splits(X_train, y_train)
+        print('X_train shape: {}.'.format(X_train.shape))
+        print('y_train shape: {}.'.format(y_train.shape))
+        print('X_val shape: {}.'.format(X_val.shape))
+        print('y_val shape: {}.'.format(y_val.shape))
     else:
-        with np.load('./data/train_params.npy').item() as data:
-            voxel_mean = data['mean']
-            voxel_std = data['std']
+        X_train = np.stack(X_train, axis=0)
+        y_train = np.stack(y_train, axis=0)
+        print('X_train shape: {}.'.format(X_train.shape))
+        print('y_train shape: {}.'.format(y_train.shape))
+
+    # Compute mean and std for normalization.
+    print('Calculate voxel-wise mean and std per channel of training set.')
+    voxel_mean, voxel_std = compute_train_norm(X_train, data_format=args.data_format)
     print('Voxel-wise mean per channel: {}.'.format(voxel_mean))
     print('Voxel-wise std per channel: {}.'.format(voxel_std))
 
     # Normalize training and validation data.
     print('Apply per channel normalization.')
-    X = normalize(voxel_mean, voxel_std, X, args.shard_size, data_format=args.data_format)
+    X_train = normalize(voxel_mean, voxel_std, X_train, args.shard_size, data_format=args.data_format)
+    if args.create_val:
+        X_val = normalize(voxel_mean, voxel_std, X_val, args.shard_size, data_format=args.data_format)
 
-    # If not training data, save data.
-    if not args.train:
         writer = tf.io.TFRecordWriter('./data/val.tfrecords')
-        for XX, yy in tqdm(zip(X, y)):
+        for X, y in tqdm(zip(X_val, y_val)):
             for _ in range(args.n_crops):
-                X_crop, y_crop = sample_crop(XX, yy, data_format=args.data_format)
+                X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
                 example_to_tfrecords(X_crop, y_crop, writer)
-    else:
-        # Compute shifts and scales for intensification.
-        print('Calculate intensity shifts and scales per channel.')
-        shifts = np.random.uniform(low=0.0-args.intensity_shift,
-                                high=0.0+args.intensity_shift,
-                                size=(IN_CH,))
-        shifts = shifts * voxel_std
-        scales = np.random.uniform(low=1.0-args.intensity_scale,
-                                high=1.0+args.intensity_scale,
-                                size=(IN_CH,))
-        print('Intensity shifts per channel: {}.'.format(shifts))
-        print('Intensity scales per channel: {}.'.format(scales))
+        del X_val
+        del y_val
 
-        # Apply intensity shifts and scales.
-        print('Apply per channel intensity shifts and scales.')
-        X = intensify(shifts, scales, X, args.shard_size, data_format=args.data_format)
+    # Compute shifts and scales for intensification.
+    print('Calculate intensity shifts and scales per channel.')
+    shifts = np.random.uniform(low=0.0-args.intensity_shift,
+                               high=0.0+args.intensity_shift,
+                               size=(IN_CH,))
+    shifts = shifts * voxel_std
+    scales = np.random.uniform(low=1.0-args.intensity_scale,
+                               high=1.0+args.intensity_scale,
+                               size=(IN_CH,))
+    print('Intensity shifts per channel: {}.'.format(shifts))
+    print('Intensity scales per channel: {}.'.format(scales))
 
-        # Randomly flip for data augmentation.
-        print('Randomly augment training data, crop, and save.')
-        writer = tf.io.TFRecordWriter('./data/train.tfrecords')
+    # Apply intensity shifts and scales.
+    print('Apply per channel intensity shifts and scales.')
+    X_train = intensify(shifts, scales, X_train, args.shard_size, data_format=args.data_format)
 
-        for XX, yy in tqdm(zip(X, y)):
-            # Augment.
-            if np.random.uniform() < args.mirror_prob:
-                if args.data_format == 'channels_last':
-                    X_augment = np.flip(XX, axis=(1, 2, 3))
-                    y_augment = np.flip(yy, axis=(1, 2, 3))
-                elif args.data_format == 'channels_first':
-                    X_augment = np.flip(XX, axis=(2, 3, 4))
-                    y_augment = np.flip(yy, axis=(2, 3, 4))
+    # Randomly flip for data augmentation.
+    print('Randomly augment training data, crop, and save.')
+    writer = tf.io.TFRecordWriter('./data/train.tfrecords')
 
-                # Write augmented crops to TFRecord.
-                for _ in range(args.n_crops):
-                    X_crop, y_crop = sample_crop(X_augment, y_augment, data_format=args.data_format)
-                    example_to_tfrecords(X_crop, y_crop, writer)
+    for X, y in tqdm(zip(X_train, y_train)):
+        # Augment.
+        if np.random.uniform() < args.mirror_prob:
+            if args.data_format == 'channels_last':
+                X_augment = np.flip(X, axis=(1, 2, 3))
+                y_augment = np.flip(y, axis=(1, 2, 3))
+            elif args.data_format == 'channels_first':
+                X_augment = np.flip(X, axis=(2, 3, 4))
+                y_augment = np.flip(y, axis=(2, 3, 4))
 
-            # Write original crop to TFRecord.
+            # Write augmented crops to TFRecord.
             for _ in range(args.n_crops):
-                X_crop, y_crop = sample_crop(XX, yy, data_format=args.data_format)
+                X_crop, y_crop = sample_crop(X_augment, y_augment, data_format=args.data_format)
                 example_to_tfrecords(X_crop, y_crop, writer)
+
+        # Write original crop to TFRecord.
+        for _ in range(args.n_crops):
+            X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
+            example_to_tfrecords(X_crop, y_crop, writer)
 
 
 if __name__ == '__main__':
