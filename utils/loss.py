@@ -78,7 +78,7 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
         y_pred_ch = tf.reshape(y_pred[..., channel], [-1])
         y_true_ch = tf.dtypes.cast(y_true == l, tf.float32)
 
-        numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true_ch * y_pred_ch))
+        numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true_ch * y_pred_ch)) + eps
         denom = tf.math.reduce_sum(y_true_ch ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
         loss_dice += numer / denom
 
