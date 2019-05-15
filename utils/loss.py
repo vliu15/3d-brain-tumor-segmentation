@@ -14,7 +14,7 @@ def kullbach_liebler_loss(z_mean, z_logvar, n_voxels):
                 z_mean ** 2 + tf.math.exp(z_logvar) - z_logvar - 1.0)
 
 
-def generalized_dice_loss(y_true, y_pred, data_format='channels_last'):
+def generalized_dice_loss(y_true, y_pred, data_format='channels_last', eps=1e-8):
     """Returns generalized dice loss between target and prediction.
     
         Args:
@@ -41,11 +41,11 @@ def generalized_dice_loss(y_true, y_pred, data_format='channels_last'):
         y_true = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - labels, tf.bool), tf.float32)
 
         # Compute weight invariance.
-        w = 1.0 / (tf.reduce_sum(y_true, axis=(0, 1, 2, 3)) ** 2)
+        w = 1.0 / (tf.reduce_sum(y_true, axis=(0, 1, 2, 3)) ** 2 + eps)
 
         # Compute generalized dice loss.
-        numer = tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=(0, 1, 2, 3)))
-        denom = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=(0, 1, 2, 3)))
+        numer = tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=(0, 1, 2, 3))) + eps
+        denom = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=(0, 1, 2, 3))) + eps
 
     elif data_format == 'channels_first':
         # Create binary mask for each label and corresponding channel.
@@ -54,11 +54,11 @@ def generalized_dice_loss(y_true, y_pred, data_format='channels_last'):
         y_true = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - labels, tf.bool), tf.float32)
     
         # Compute weight invariance.
-        w = 1.0 / (tf.reduce_sum(y_true, axis=(0, 2, 3, 4)) ** 2)
-            
+        w = 1.0 / (tf.reduce_sum(y_true, axis=(0, 2, 3, 4)) ** 2 + eps)
+
         # Compute generalized dice loss.
-        numer = tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=(0, 2, 3, 4)))
-        denom = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=(0, 2, 3, 4)))
+        numer = tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=(0, 2, 3, 4))) + eps
+        denom = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=(0, 2, 3, 4))) + eps
 
     return 1.0 - 2.0 * numer / denom
 
