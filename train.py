@@ -76,9 +76,9 @@ def main(args):
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
-                    y_pred, y_vae, z_mean, z_var = model(x_batch)
+                    y_pred, y_vae, z_mean, z_logvar = model(x_batch)
                     loss = compute_myrnenko_loss(
-                                x_batch, y_batch, y_pred, y_vae, z_mean, z_var, data_format=args.data_format)
+                                x_batch, y_batch, y_pred, y_vae, z_mean, z_logvar, data_format=args.data_format)
                     loss += sum(model.losses)
 
                 # Gradients and backward.
@@ -105,9 +105,9 @@ def main(args):
 
             with tf.device(args.device):
                 # Forward and loss.
-                y_pred, y_vae, z_mean, z_var = model(x_batch)
+                y_pred, y_vae, z_mean, z_logvar = model(x_batch)
                 loss = compute_myrnenko_loss(
-                                x_batch, y_batch, y_pred, y_vae, z_mean, z_var, data_format=args.data_format)
+                                x_batch, y_batch, y_pred, y_vae, z_mean, z_logvar, data_format=args.data_format)
                 loss += sum(model.losses)
 
                 val_loss.update_state(loss)

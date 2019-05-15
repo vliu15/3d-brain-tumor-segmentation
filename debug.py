@@ -91,8 +91,8 @@ def test_optimizer():
 
 
 def test_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=1e-8):
-    functional_loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=eps)
-    keras_loss = get_myrnenko_loss_fn(x, y_vae, z_mean, z_var)(y_true, y_pred)
+    functional_loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=eps)
+    keras_loss = get_myrnenko_loss_fn(x, y_vae, z_mean, z_logvar)(y_true, y_pred)
 
     assert functional_loss.shape == ()
     assert keras_loss.shape == ()
@@ -109,7 +109,7 @@ def test_cnn(x, y_true):
                 dropout=0.2,
                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5))
 
-    y_pred, y_vae, z_mean, z_var = cnn(x)
+    y_pred, y_vae, z_mean, z_logvar = cnn(x)
 
     assert y_vae.shape == x.shape
 
@@ -118,7 +118,7 @@ def test_cnn(x, y_true):
     params = sum(tf.reduce_prod(var.shape) for var in cnn.trainable_variables)
     print('Number of trainable parameters: {}.'.format(params))
 
-    loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=1e-8)
+    loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=1e-8)
     print('Loss: {}.'.format(loss))
 
     return y_hat, y_vae, z_mean, z_var

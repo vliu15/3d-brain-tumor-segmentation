@@ -7,9 +7,9 @@ from utils.constants import *
 
 def sample(latent_args):
     """Samples from the Gaussian given by mean and variance."""
-    mean, var = latent_args
-    eps = tf.random.normal(shape=mean.shape, dtype=tf.float32)
-    return mean + tf.math.exp(0.5 * var) * eps
+    z_mean, z_logvar = latent_args
+    eps = tf.random.normal(shape=z_mean.shape, dtype=tf.float32)
+    return z_mean + tf.math.exp(0.5 * z_logvar) * eps
 
 
 class VariationalAutoencoderBlock(tf.keras.layers.Layer):
@@ -123,9 +123,12 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         self.sample = tf.keras.layers.Lambda(sample)
 
         # VU Block
-        self.proj_VU = tf.keras.layers.Dense(H/16 * W/16 * D/16 * 1)
+        h = int(H/16)
+        w = int(W/16)
+        d = int(D/16)
+        self.proj_VU = tf.keras.layers.Dense(h * w * d * 1)
         self.relu_VU = tf.keras.layers.Activation('relu')
-        self.reshape_VU = tf.keras.layers.Reshape((H/16, W/16, D/16, 1))
+        self.reshape_VU = tf.keras.layers.Reshape((h, w, d, 1))
         self.conv1d_VU = tf.keras.layers.Conv3D(
                                 filters=VAE_VU_BLOCK_SIZE,
                                 kernel_size=1,
@@ -186,8 +189,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
 
         # VDraw Block
         z_mean = x[:, :VAE_LATENT_SIZE]
-        z_var = x[:, VAE_LATENT_SIZE:]
-        x = self.sample([z_mean, z_var])
+        z_logvar = x[:, VAE_LATENT_SIZE:]
+        x = self.sample([z_mean, z_logvar])
 
         # VU Block
         x = self.proj_VU(x)
@@ -208,6 +211,4 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         # Vend
         x = self.conv_out(x)
 
-        y_vae = x
-
-        return y_vae, z_mean, z_var
+        return x, z_mean, z_logvar

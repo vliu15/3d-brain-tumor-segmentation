@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from utils.constants import *
 
-def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var,
+def get_myrnenko_loss_fn(x, y_vae, z_mean, z_logvar,
                          eps=1e-8, data_format='channels_last'):
     """Returns a Keras-compatible function that computes Myrnenko loss.
     
@@ -10,7 +10,7 @@ def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var,
             x: input to the model.
             y_vae: output from VAE branch.
             z_mean: mean of sampling distribution.
-            z_var: variance of sampilng distribution.
+            z_logvar: log variance of sampilng distribution.
             eps: small float to avoid division by 0.
 
         Returns:
@@ -43,12 +43,12 @@ def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var,
 
     loss_l2 = tf.math.reduce_sum((x - y_vae) ** 2)
     loss_kl = tf.math.reduce_sum(
-                z_mean ** 2 + z_var - tf.math.log(z_var) - 1.0) / N
+                z_mean ** 2 + tf.math.exp(z_logvar) - z_logvar - 1.0) / N
     
     return myrnenko_loss_fn
 
 
-def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var,
+def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
                           eps=1e-8, data_format='channels_last'):
     """Computes and returns Myrnenko loss.
     
@@ -58,7 +58,7 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var,
             y_pred: predicted model output.
             y_vae: output from VAE branch.
             z_mean: mean of sampling distribution.
-            z_var: variance of sampilng distribution.
+            z_logvar: log variance of sampilng distribution.
             eps: small float to avoid division by 0.
 
         Returns:
@@ -69,7 +69,7 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var,
 
     loss_l2 = tf.math.reduce_sum((x - y_vae) ** 2)
     loss_kl = tf.math.reduce_sum(
-                z_mean ** 2 + z_var - tf.math.log(z_var) - 1.0) / N
+                z_mean ** 2 + tf.math.exp(z_logvar) - z_logvar - 1.0) / N
 
     loss_dice = 0.0
 

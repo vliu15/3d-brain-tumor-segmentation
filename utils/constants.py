@@ -50,7 +50,7 @@ DEC_CONV_LAYER_SIZE         =       16                      # Number of filters 
 VAE_VD_CONV_SIZE            =       8                       # Number of filters in VD conv layer.
 VAE_VD_BLOCK_SIZE           =       128                     # Dimensionality of flattened size.
 
-VAE_LATENT_SIZE             =       VAE_VD_BLOCK_SIZE / 2   # Dimensionality of sampling space.
+VAE_LATENT_SIZE             =       64                      # Dimensionality of sampling space.
 
 VAE_VU_BLOCK_SIZE           =       128                     # Number of filters in VU conv block.
 

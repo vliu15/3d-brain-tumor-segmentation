@@ -33,6 +33,6 @@ class VolumetricCNN(tf.keras.models.Model):
     def call(self, x):
         enc_outs = self.encoder(x)
         y_pred = self.decoder(enc_outs)
-        y_vae, z_mean, z_var = self.vae(enc_outs[-1])
+        y_vae, z_mean, z_logvar = self.vae(enc_outs[-1])
 
-        return y_pred, y_vae, z_mean, z_var
+        return y_pred, y_vae, z_mean, z_logvar
