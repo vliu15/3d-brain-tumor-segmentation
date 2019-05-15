@@ -77,18 +77,20 @@ def main(args):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
                     y_pred, y_vae, z_mean, z_logvar = model(x_batch)
-                    loss = compute_myrnenko_loss(
-                                x_batch, y_batch, y_pred, y_vae, z_mean, z_logvar, data_format=args.data_format)
-                    loss += sum(model.losses)
+                    loss_l2, loss_kl, loss_dice, loss_total = compute_myrnenko_loss(
+                                            x_batch, y_batch, y_pred, y_vae, z_mean,
+                                            z_logvar, data_format=args.data_format, log=True)
+                    loss_total += sum(model.losses)
 
                 # Gradients and backward.
-                grads = tape.gradient(loss, model.trainable_variables)
+                grads = tape.gradient(loss_total, model.trainable_variables)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-                train_loss.update_state(loss)
+                train_loss.update_state(loss_total)
 
             if step % args.log_steps == 0:
-                print('Step {}. Loss: {}.'.format(step, loss))
+                print('Step {}. L2 Loss: {:.2f}. KL Loss: {:.5f}. Dice Loss: {:.5f}. Total Loss: {:.5f}'
+                    .format(step, loss_l2, loss_kl, loss_dice, loss_total))
 
         avg_train_loss = train_loss.result() / n_train
         train_loss.reset_states()
@@ -109,15 +111,17 @@ def main(args):
             with tf.device(args.device):
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_logvar = model(x_batch)
-                loss = compute_myrnenko_loss(
-                                x_batch, y_batch, y_pred, y_vae, z_mean, z_logvar, data_format=args.data_format)
-                loss += sum(model.losses)
+                loss_l2, loss_kl, loss_dice, loss_total = compute_myrnenko_loss(
+                                            x_batch, y_batch, y_pred, y_vae, z_mean,
+                                            z_logvar, data_format=args.data_format, log=True)
+                loss_total += sum(model.losses)
 
-                val_loss.update_state(loss)
+                val_loss.update_state(loss_total)
 
         avg_val_loss = val_loss.result() / n_val
         val_loss.reset_states()
-        print('Validation loss: {}.'.format(avg_val_loss))
+        print('Validation. L2 Loss: {:.2f}. KL Loss: {:.5f}. Dice Loss: {:.5f}. Total Loss: {:.5f}'
+                .format(loss_l2, loss_kl, loss_dice, loss_total))
 
         # Write logs.
         if args.log_file:

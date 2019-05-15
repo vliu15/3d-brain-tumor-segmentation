@@ -49,7 +49,7 @@ def get_myrnenko_loss_fn(x, y_vae, z_mean, z_logvar,
 
 
 def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
-                          eps=1e-8, data_format='channels_last'):
+                          eps=1e-8, data_format='channels_last', log=False):
     """Computes and returns Myrnenko loss.
     
         Args:
@@ -60,6 +60,7 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
             z_mean: mean of sampling distribution.
             z_logvar: log variance of sampilng distribution.
             eps: small float to avoid division by 0.
+            log: whether to output all intermediate losses for logging.
 
         Returns:
             Myrnenko loss.
@@ -81,4 +82,9 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
         denom = tf.math.reduce_sum(y_true_ch ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
         loss_dice += numer / denom
 
-    return loss_dice + 0.1 * loss_l2 + 0.1 * loss_kl
+    loss_total = loss_dice + 0.1 * loss_l2 + 0.1 * loss_kl
+
+    if log:
+        return loss_l2, loss_kl, loss_dice, loss_total
+    
+    return loss_total
