@@ -16,6 +16,8 @@ def prepro_parser():
             help='Format of preprocessed data: `channels_last` or `channels_first`.')
 
     # Specifics.
+    parser.add_argument('--train', action='store_true', default=False,
+            elp='Whether the preprocessing is on training data.')
     parser.add_argument('--create_val', action='store_true', default=False,
             help='Whether to create validation split from training data.')
     parser.add_argument('--intensity_shift', type=float, default=0.1,
