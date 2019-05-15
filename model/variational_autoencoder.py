@@ -123,9 +123,9 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         self.sample = tf.keras.layers.Lambda(sample)
 
         # VU Block
-        self.proj_VU = tf.keras.layers.Dense(10*12*8*1)
+        self.proj_VU = tf.keras.layers.Dense(H/16 * W/16 * D/16 * 1)
         self.relu_VU = tf.keras.layers.Activation('relu')
-        self.reshape_VU = tf.keras.layers.Reshape((10, 12, 8, 1))
+        self.reshape_VU = tf.keras.layers.Reshape((H/16, W/16, D/16, 1))
         self.conv1d_VU = tf.keras.layers.Conv3D(
                                 filters=VAE_VU_BLOCK_SIZE,
                                 kernel_size=1,
