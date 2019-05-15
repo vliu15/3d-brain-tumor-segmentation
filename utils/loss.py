@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from utils.constants import *
 
 def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var,
                          eps=1e-8, data_format='channels_last'):
@@ -25,16 +26,15 @@ def get_myrnenko_loss_fn(x, y_vae, z_mean, z_var,
             Returns:
                 Myrnenko loss.
         """
-        axis = -1 if data_format == 'channels_last' else 2
         y_true = tf.reshape(y_true, [-1])
-        n_channels = y_pred.shape[axis]
         loss_dice = 0.0
 
-        for channel in range(n_channels):
+        for l, channel in zip(LABELS, range(OUT_CH)):
             y_pred_ch = tf.reshape(y_pred[..., channel], [-1])
+            y_true_ch = tf.dtypes.cast(y_true == l, tf.float32)
 
-            numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true * y_pred_ch))
-            denom = tf.math.reduce_sum(y_true ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
+            numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true_ch * y_pred_ch))
+            denom = tf.math.reduce_sum(y_true_ch ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
             loss_dice += numer / denom
 
         return loss_dice + 0.1 * loss_l2 + 0.1 * loss_kl
@@ -65,21 +65,20 @@ def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_var,
             Myrnenko loss.
     """
     N = tf.cast(tf.math.reduce_prod(x.shape), tf.float32)
+    y_true = tf.reshape(y_true, [-1])
 
     loss_l2 = tf.math.reduce_sum((x - y_vae) ** 2)
     loss_kl = tf.math.reduce_sum(
                 z_mean ** 2 + z_var - tf.math.log(z_var) - 1.0) / N
 
-    axis = -1 if data_format == 'channels_last' else 2
-    y_true = tf.reshape(y_true, [-1])
-    n_channels = y_pred.shape[axis]
     loss_dice = 0.0
 
-    for channel in range(n_channels):
+    for l, channel in zip(LABELS, range(OUT_CH)):
         y_pred_ch = tf.reshape(y_pred[..., channel], [-1])
+        y_true_ch = tf.dtypes.cast(y_true == l, tf.float32)
 
-        numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true * y_pred_ch))
-        denom = tf.math.reduce_sum(y_true ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
+        numer = 2.0 * tf.math.reduce_sum(tf.math.abs(y_true_ch * y_pred_ch))
+        denom = tf.math.reduce_sum(y_true_ch ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
         loss_dice += numer / denom
 
     return loss_dice + 0.1 * loss_l2 + 0.1 * loss_kl

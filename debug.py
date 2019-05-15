@@ -126,14 +126,14 @@ def test_cnn(x, y_true):
 
 def main(args):
     if args.test_encoder:
-        x = np.random.randn(1, 160, 192, 128, 4)
+        x = np.random.randn(1, 160, 192, 128, 4).astype(np.float32)
         _ = test_encoder(x)
 
     if args.test_decoder:
-        enc32 = np.random.randn(1, 160, 192, 128, 32)
-        enc64 = np.random.randn(1, 80, 96, 64, 64)
-        enc128 = np.random.randn(1, 40, 48, 32, 128)
-        enc256 = np.random.randn(1, 20, 24, 16, 256)
+        enc32 = np.random.randn(1, 160, 192, 128, 32).astype(np.float32)
+        enc64 = np.random.randn(1, 80, 96, 64, 64).astype(np.float32)
+        enc128 = np.random.randn(1, 40, 48, 32, 128).astype(np.float32)
+        enc256 = np.random.randn(1, 20, 24, 16, 256).astype(np.float32)
         enc_outs = (enc32, enc64, enc128, enc256)
 
         _ = test_decoder(enc_outs)
@@ -146,12 +146,13 @@ def main(args):
         test_optimizer()
 
     if args.test_loss:
-        x = np.random.randn(1, 160, 192, 128, 4)
-        y_true = np.random.randn(1, 160, 192, 128, 1)
-        y_pred = np.random.randn(1, 160, 192, 128, 3)
-        y_vae = np.random.randn(1, 160, 192, 128, 4)
-        z_mean = np.random.randn(128, 1)
-        z_var = np.random.randn(128, 1)
+        x = np.random.randn(1, 160, 192, 128, 4).astype(np.float32)
+        y_true = np.random.randn(1, 160, 192, 128, 1).astype(np.float32)
+        y_pred = np.random.randn(1, 160, 192, 128, 3).astype(np.float32)
+        y_pred *= (y_pred > 0.5)
+        y_vae = np.random.randn(1, 160, 192, 128, 4).astype(np.float32)
+        z_mean = np.random.randn(128, 1).astype(np.float32)
+        z_var = np.random.randn(128, 1).astype(np.float32)
         test_loss(x, y_true, y_pred, y_vae, z_mean, z_var)
 
     if args.test_cnn:
