@@ -6,7 +6,7 @@ from model.encoder import ConvEncoder
 from model.decoder import ConvDecoder
 from model.variational_autoencoder import VariationalAutoencoder
 from model.volumetric_cnn import VolumetricCNN
-from utils.loss import compute_myrnenko_loss, get_myrnenko_loss_fn
+from utils.loss import compute_myrnenko_loss
 from utils.optimizer import ScheduledAdam
 
 
@@ -90,15 +90,12 @@ def test_optimizer():
     print('Passed basic sanity checks.')
 
 
-def test_loss(x, y_true, y_pred, y_vae, z_mean, z_var, eps=1e-8):
-    functional_loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=eps)
-    keras_loss = get_myrnenko_loss_fn(x, y_vae, z_mean, z_logvar)(y_true, y_pred)
+def test_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=1e-8):
+    loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=eps)
 
-    assert functional_loss.shape == ()
-    assert keras_loss.shape == ()
+    assert loss.shape == ()
 
-    print('Functional loss: {}.'.format(functional_loss))
-    print('Keras-style loss: {}.'.format(keras_loss))
+    print('Myrnonenko loss: {}.'.format(loss))
 
 
 def test_cnn(x, y_true):
@@ -146,14 +143,14 @@ def main(args):
         test_optimizer()
 
     if args.test_loss:
-        x = np.random.randn(1, 160, 192, 128, 4).astype(np.float32)
+        x = np.random.randn(1, 160, 192, 128, 2).astype(np.float32)
         y_true = np.random.randn(1, 160, 192, 128, 1).astype(np.float32)
         y_pred = np.random.randn(1, 160, 192, 128, 3).astype(np.float32)
         y_pred *= (y_pred > 0.5)
-        y_vae = np.random.randn(1, 160, 192, 128, 4).astype(np.float32)
+        y_vae = np.random.randn(1, 160, 192, 128, 2).astype(np.float32)
         z_mean = np.random.randn(128, 1).astype(np.float32)
-        z_var = np.random.randn(128, 1).astype(np.float32)
-        test_loss(x, y_true, y_pred, y_vae, z_mean, z_var)
+        z_logvar = np.random.randn(128, 1).astype(np.float32)
+        test_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar)
 
     if args.test_cnn:
         x = np.random.randn(1, 160, 192, 128, 4).astype(np.float32)
