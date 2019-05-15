@@ -208,11 +208,11 @@ def main(args):
     if args.intensify:
         # Compute shifts and scales for intensification.
         print('Calculate intensity shifts and scales per channel.')
-        shifts = np.random.uniform(low=0.0-args.intensity_shift,
+        shifts = np.random.normal(low=0.0-args.intensity_shift,
                                 high=0.0+args.intensity_shift,
                                 size=(IN_CH,))
         shifts = shifts * voxel_std
-        scales = np.random.uniform(low=1.0-args.intensity_scale,
+        scales = np.random.normal(low=1.0-args.intensity_scale,
                                 high=1.0+args.intensity_scale,
                                 size=(IN_CH,))
         print('Intensity shifts per channel: {}.'.format(shifts))
