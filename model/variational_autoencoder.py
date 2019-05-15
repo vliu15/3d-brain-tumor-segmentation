@@ -120,8 +120,6 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         self.proj_VD = tf.keras.layers.Dense(VAE_VD_BLOCK_SIZE)
 
         # VDraw Block
-        self.mean = tf.keras.layers.Dense(VAE_LATENT_SIZE)
-        self.var = tf.keras.layers.Dense(VAE_LATENT_SIZE)
         self.sample = tf.keras.layers.Lambda(sample)
 
         # VU Block
@@ -187,8 +185,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         x = self.proj_VD(x)
 
         # VDraw Block
-        z_mean = self.mean(x)
-        z_var = self.var(x)
+        z_mean = x[:LATENT_SIZE]
+        z_var = x[LATENT_SIZE:]
         x = self.sample([z_mean, z_var])
 
         # VU Block
