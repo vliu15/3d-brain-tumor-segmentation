@@ -87,7 +87,7 @@ def main(args):
 
                 train_loss.update_state(loss)
 
-            if args.log_steps % step == 0:
+            if steps % args.log_steps == 0:
                 print('Step {}. Loss: {}.'.format(step, loss))
 
         avg_train_loss = train_loss.result() / n_train
