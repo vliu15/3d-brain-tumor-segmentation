@@ -185,8 +185,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         x = self.proj_VD(x)
 
         # VDraw Block
-        z_mean = x[:LATENT_SIZE]
-        z_var = x[LATENT_SIZE:]
+        z_mean = x[:VAE_LATENT_SIZE]
+        z_var = x[VAE_LATENT_SIZE:]
         x = self.sample([z_mean, z_var])
 
         # VU Block
