@@ -93,11 +93,11 @@ def sensitivity_specificity_loss(y_true, y_pred, lamb=0.05,
         y_true = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - labels, tf.bool), tf.float32)
 
         # Compute sensitivity.
-        sensitivity_numer = tf.reduce_sum(y_true * (y_true - y_pred) ** 2, axis=(0, 1, 2, 3))
+        sensitivity_numer = tf.reduce_sum(y_true * (y_true - y_pred) ** 2, axis=(0, 1, 2, 3)) + eps
         sensitivity_demon = tf.reduce_sum(y_true, axis=(0, 1, 2, 3)) + eps
 
         # Compute specificity.
-        specificity_numer = tf.reduce_sum((1 - y_true) * (y_true - y_pred) ** 2, axis=(0, 1, 2, 3))
+        specificity_numer = tf.reduce_sum((1 - y_true) * (y_true - y_pred) ** 2, axis=(0, 1, 2, 3)) + eps
         specificity_denom = tf.reduce_sum((1 - y_true), axis=(0, 1, 2, 3)) + eps
 
     elif data_format == 'channels_first':
@@ -107,11 +107,11 @@ def sensitivity_specificity_loss(y_true, y_pred, lamb=0.05,
         y_true = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - labels, tf.bool), tf.float32)
 
         # Compute sensitivity.
-        sensitivity_numer = tf.reduce_sum(y_true * (y_true - y_pred) ** 2, axis=(0, 2, 3, 4))
+        sensitivity_numer = tf.reduce_sum(y_true * (y_true - y_pred) ** 2, axis=(0, 2, 3, 4)) + eps
         sensitivity_demon = tf.reduce_sum(y_true, axis=(0, 2, 3, 4)) + eps
 
         # Compute specificity.
-        specificity_numer = tf.reduce_sum((1 - y_true) * (y_true - y_pred) ** 2, axis=(0, 2, 3, 4))
+        specificity_numer = tf.reduce_sum((1 - y_true) * (y_true - y_pred) ** 2, axis=(0, 2, 3, 4)) + eps
         specificity_denom = tf.reduce_sum((1 - y_true), axis=(0, 2, 3, 4)) + eps
 
     sensivitity = tf.reduce_sum(sensitivity_numer / sensitivity_demon)
@@ -120,7 +120,7 @@ def sensitivity_specificity_loss(y_true, y_pred, lamb=0.05,
     return lamb * sensitivity + (1 - lamb) * specificity
 
 
-def compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
+def myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
                           eps=1e-8, data_format='channels_last'):
     """Computes and returns Myrnenko loss.
     

@@ -6,7 +6,7 @@ from model.encoder import ConvEncoder
 from model.decoder import ConvDecoder
 from model.variational_autoencoder import VariationalAutoencoder
 from model.volumetric_cnn import VolumetricCNN
-from utils.loss import compute_myrnenko_loss
+from utils.loss import myrnenko_loss
 from utils.optimizer import ScheduledAdam
 
 
@@ -91,7 +91,7 @@ def test_optimizer():
 
 
 def test_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=1e-8):
-    loss = compute_myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=eps)
+    loss = myrnenko_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar, eps=eps)
 
     assert loss.shape == ()
 

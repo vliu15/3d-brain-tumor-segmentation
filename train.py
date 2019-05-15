@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.loss import compute_myrnenko_loss
+from utils.loss import myrnenko_loss
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
 from model.volumetric_cnn import VolumetricCNN
@@ -77,9 +77,9 @@ def main(args):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
                     y_pred, y_vae, z_mean, z_logvar = model(x_batch)
-                    loss = compute_myrnenko_loss(
-                                            x_batch, y_batch, y_pred, y_vae, z_mean,
-                                            z_logvar, data_format=args.data_format)
+                    loss = myrnenko_loss(
+                                         x_batch, y_batch, y_pred, y_vae, z_mean,
+                                         z_logvar, data_format=args.data_format)
                     loss += sum(model.losses)
 
                 # Gradients and backward.
@@ -111,9 +111,9 @@ def main(args):
             with tf.device(args.device):
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_logvar = model(x_batch)
-                loss = compute_myrnenko_loss(
-                                            x_batch, y_batch, y_pred, y_vae, z_mean,
-                                            z_logvar, data_format=args.data_formate)
+                loss = myrnenko_loss(
+                                     x_batch, y_batch, y_pred, y_vae, z_mean,
+                                     z_logvar, data_format=args.data_formate)
                 loss += sum(model.losses)
 
                 val_loss.update_state(loss)
