@@ -21,8 +21,8 @@ def prepare_dataset(path, batch_size):
         return sum(1 for _ in tf_dataset)
 
     example_desc = {
-        'X': tf.io.FixedLenFeature([160 * 192 * 128 * 4], tf.float32),
-        'y': tf.io.FixedLenFeature([160 * 192 * 128 * 1], tf.float32)
+        'X': tf.io.FixedLenFeature([H * W * D * IN_CH], tf.float32),
+        'y': tf.io.FixedLenFeature([H * W * D * 1], tf.float32)
     }
 
     dataset = tf.data.TFRecordDataset(path)
