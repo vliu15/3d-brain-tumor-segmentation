@@ -1,7 +1,6 @@
 """Contains frequently used constants."""
 # Preprocessing.
-# ALL_MODALITIES = ['t1', 't1ce', 'flair', 't2']
-ALL_MODALITIES = ['t1ce', 'flair']
+ALL_MODALITIES = ['t1', 't1ce', 'flair', 't2']
 TRUTH = 'seg'
 
 
@@ -55,6 +54,3 @@ VAE_VU_BLOCK_SIZE           =       256     # Number of filters in VU conv block
 VAE_CONV_BLOCK2_SIZE        =       128     # Number of filters in second conv block.
 VAE_CONV_BLOCK1_SIZE        =       64      # Number of filters in first conv block.
 VAE_CONV_BLOCK0_SIZE        =       32      # Number of filters in zeroth conv block.
-
-# Loss.
-LABELS      =       [1, 2, 4]

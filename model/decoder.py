@@ -158,7 +158,4 @@ class ConvDecoder(tf.keras.layers.Layer):
         x = self.conv_out(x)
         x = self.ptwise_logits(x)
 
-        # Generate voxel-wise binaries for segmented portion or not
-        x = tf.dtypes.cast(x > 0.5, tf.float32)
-
         return x
