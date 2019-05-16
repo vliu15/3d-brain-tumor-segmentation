@@ -26,7 +26,7 @@ def prepare_dataset(path, batch_size):
     }
 
     dataset = tf.data.TFRecordDataset(path)
-    dataset = dataset.map(parse_example).shuffle(570).batch(batch_size)
+    dataset = dataset.map(parse_example).shuffle(10000).batch(batch_size)
 
     return dataset, get_dataset_len(dataset)
 
@@ -55,7 +55,7 @@ def main(args):
     
     # Set up logging.
     if args.log_file:
-        with open(args.log, 'w') as f:
+        with open(args.log_file, 'w') as f:
             f.write('epoch,lr,train_loss,val_loss\n')
 
     best_val_loss = float('inf')
