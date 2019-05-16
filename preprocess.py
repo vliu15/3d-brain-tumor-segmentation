@@ -188,6 +188,8 @@ def main(args):
     # Compute mean and std for normalization.
     print('Calculate voxel-wise mean and std per channel of training set.')
     voxel_mean, voxel_std = compute_train_norm(X_train, data_format=args.data_format)
+    np.save(os.path.join(args.out_folder, 'voxel_mean_std.npy'),
+            {'mean': voxel_mean, 'std': voxel_std})
     print('Voxel-wise mean per channel: {}.'.format(voxel_mean))
     print('Voxel-wise std per channel: {}.'.format(voxel_std))
 
@@ -197,7 +199,7 @@ def main(args):
     if args.create_val:
         X_val = normalize(voxel_mean, voxel_std, X_val, args.shard_size, data_format=args.data_format)
 
-        writer = tf.io.TFRecordWriter('./data/val.tfrecords')
+        writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'val.tfrecords'))
         for X, y in tqdm(zip(X_val, y_val)):
             for _ in range(args.n_crops):
                 X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
@@ -224,7 +226,7 @@ def main(args):
 
     # Randomly flip for data augmentation.
     print('Randomly augment training data, crop, and save.')
-    writer = tf.io.TFRecordWriter('./data/train.tfrecords')
+    writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'train.tfrecords'))
 
     for X, y in tqdm(zip(X_train, y_train)):
         # Augment.

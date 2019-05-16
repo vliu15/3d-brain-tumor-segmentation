@@ -1,4 +1,5 @@
 import argparse
+import os
 
 
 def prepro_parser():
@@ -15,7 +16,7 @@ def prepro_parser():
             choices=['channels_last', 'channels_first'],
             help='Format of preprocessed data: `channels_last` or `channels_first`.')
 
-    # Specifics.
+    # Preprocessing.
     parser.add_argument('--create_val', action='store_true', default=False,
             help='Whether to create validation split from training data.')
     parser.add_argument('--intensify', action='store_true', default=False,
@@ -30,6 +31,9 @@ def prepro_parser():
             help='Number of random crops to sample per image.')
 
     args = parser.parse_args()
+
+    if not os.path.isdir(args.out_folder):
+        os.mkdir(args.out_folder)
 
     return args
 
@@ -89,3 +93,10 @@ def train_parser():
             'tf.keras.layers.Conv3D only supports `channels_last` input for CPU.'
 
     return args
+
+
+def test_parser():
+    parser = argparse.ArgumentParser()
+
+    # Model path.
+    parser.add_argument('--chkpt')
