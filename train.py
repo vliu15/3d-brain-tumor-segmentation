@@ -132,9 +132,9 @@ def main(args):
 
         # Write logs.
         if args.log_file:
-            with open(args.log_file, 'w') as f:
+            with open(args.log_file, 'a') as f:
                 f.write('{},{},{},{}\n'.format(
-                        epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss))
+                        epoch, optimizer.learning_rate.numpy(), avg_train_loss, avg_val_loss))
 
         # Checkpoint and patience.
         if avg_val_loss < best_val_loss:
