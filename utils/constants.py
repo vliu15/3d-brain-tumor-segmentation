@@ -1,9 +1,9 @@
 """Contains frequently used constants."""
 # Preprocessing.
-# ALL_MODALITIES = ['t1', 't1ce', 'flair', 't2']
-ALL_MODALITIES = ['t1ce', 'flair']
+# BRATS_MODALITIES = ['t1', 't1ce', 'flair', 't2']
+RTOG_MODALITIES = ['t1c', 'flair']
+BRATS_MODALITIES = ['t1ce', 'flair']
 TRUTH = 'seg'
-
 
 # Data.
 RAW_H    =  240                     # Height of raw image.
@@ -13,7 +13,7 @@ H        =  128                     # Target height of preprocessed image.
 W        =  128                     # Target width of preprocessed image.
 D        =  128                     # Target depth of preprocessed image.
 
-IN_CH    =  len(ALL_MODALITIES)     # Number of input channels.
+IN_CH    =  len(BRATS_MODALITIES)     # Number of input channels.
 OUT_CH   =  3                       # Number of output channels.
 
 CHANNELS_FIRST_X_SHAPE     =   (-1, IN_CH, H, W, D)

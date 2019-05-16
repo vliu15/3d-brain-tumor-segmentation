@@ -1,11 +1,6 @@
-'''
-    Tools for converting, normalizing, and fixing the brats data.
-    Taken from https://github.com/ellisdg/3DUnetCNN/blob/master/brats/preprocess.py.
-'''
 import glob
 import os
 import random
-
 import numpy as np
 import nibabel as nib
 from tqdm import tqdm
@@ -46,11 +41,11 @@ def create_dataset(brats_folder, data_format='channels_last'):
         if os.path.isdir(subject_folder):
             if data_format == 'channels_last':
                 X_example = np.stack(
-                    [get_npy_image(subject_folder, name) for name in ALL_MODALITIES], axis=-1)
+                    [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=-1)
                 y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=-1)
             elif data_format == 'channels_first':
                 X_example = np.stack(
-                    [get_npy_image(subject_folder, name) for name in ALL_MODALITIES], axis=0)
+                    [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=0)
                 y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=0)
         
         X.append(X_example)
@@ -149,9 +144,6 @@ def example_to_tfrecords(X, y, writer):
 
 def sample_crop(X, y, data_format='channels_last'):
     """Returns the crop of one (X, y) example."""
-    def choose_corner(dim_len, dim_size):
-        return np.random.randint(dim_size, dim_len)
-
     h = np.random.randint(H, RAW_H)
     w = np.random.randint(W, RAW_W)
     d = np.random.randint(D, RAW_D)
