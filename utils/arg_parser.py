@@ -61,7 +61,7 @@ def train_parser():
             help='Number of steps to output progress.')
     parser.add_argument('--save_file', type=str, default='chkpt.hdf5',
             help='File path to save best checkpoint.')
-    parser.add_arggument('--load_file', type=str, default='',
+    parser.add_argument('--load_file', type=str, default='',
             help='File path to load weights.')
     parser.add_argument('--patience', type=int, default=10,
             help='Number of epochs if validation scores have not improved \
