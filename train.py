@@ -88,13 +88,14 @@ def main(args):
 
                 train_loss.update_state(loss)
 
+            # Output loss to console.
             if step % args.log_steps == 0:
                 print('Step {}. Cumulative average loss: {}'
                     .format(step, train_loss.result() / step))
 
         avg_train_loss = train_loss.result() / n_train
         train_loss.reset_states()
-        print('Training loss: {}.'.format(avg_train_loss))
+        print('Average training loss: {}.'.format(avg_train_loss))
 
         # Validation epoch.
         for step, batch in tqdm(enumerate(val_data), total=n_val):
@@ -120,7 +121,7 @@ def main(args):
 
         avg_val_loss = val_loss.result() / n_val
         val_loss.reset_states()
-        print('Validation. Average loss: {}'.format(avg_val_loss))
+        print('Average validation loss: {}'.format(avg_val_loss))
 
         # Write logs.
         if args.log_file:
