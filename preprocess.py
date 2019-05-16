@@ -12,7 +12,10 @@ from utils.constants import *
 
 def get_npy_image(subject_folder, name):
     """Returns np.array from .nii.gz files."""
-    file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii.gz'))[0]
+    try:
+        file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii.gz'))[0]
+    except:
+        file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii'))[0]
     return np.array(nib.load(file_card).dataobj)
 
 
