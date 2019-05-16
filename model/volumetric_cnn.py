@@ -30,8 +30,8 @@ class VolumetricCNN(tf.keras.models.Model):
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer)
 
-    def call(self, x):
-        enc_outs = self.encoder(x)
+    def call(self, x, training=False):
+        enc_outs = self.encoder(x, training=training)
         y_pred = self.decoder(enc_outs)
         y_vae, z_mean, z_logvar = self.vae(enc_outs[-1])
 

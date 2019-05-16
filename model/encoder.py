@@ -94,7 +94,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     groups=groups,
                                     kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
-    def call(self, x):
+    def call(self, x, training=False):
         """Returns the forward pass of the ConvEncoder.
 
             {
@@ -119,7 +119,8 @@ class ConvEncoder(tf.keras.layers.Layer):
         """
         # Input layers.
         x = self.inp_conv(x)
-        x = self.inp_dropout(x)
+        if training:
+            x = self.inp_dropout(x)
 
         # First ConvBlock: filters=32, x1.
         for conv in self.conv_block_0:
