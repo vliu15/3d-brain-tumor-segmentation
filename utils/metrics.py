@@ -3,7 +3,7 @@ import tensorflow as tf
 from utils.constants import *
 
 
-def dice_coefficient(y_pred, y_true, eps=1e-8, log=False):
+def dice_coefficient(y_pred, y_true, eps=1e-8, data_format='channels_last'):
     """Returns dice coefficient between predicted and true outputs.
 
         Args:
@@ -13,32 +13,33 @@ def dice_coefficient(y_pred, y_true, eps=1e-8, log=False):
                 and the label number of a voxel with a corresponding tumor.
             eps: optional smoothing value added to the numerator and
                 denominator.
-            log: whether to output dictionary of dice coefficients per channel.
+            data_format: whether data is in the format `channels_last`
+                or `channels_first`.
 
         Returns:
             dice_coeff: average dice coefficient across all channels.
-                if log: dice coefficients per channel as well.
     """
-    y_true = tf.reshape(y_true, [-1])
-    y_pred = y_pred * tf.dtypes.cast(y_pred > 0.5, tf.float32)
+    # Create binary mask for each label and corresponding channel.
+    labels = tf.reshape(tf.convert_to_tensor(LABELS, dtype=tf.float32), shape=(1, 1, 1, 1, -1))
+    labels = tf.broadcast_to(labels, y_true.shape)
+    y_true = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - labels, tf.bool), tf.float32)
 
-    dice_coeff = {}
+    # Round probabilities >0.5 to 1 and <0.5 to 0.
+    y_pred = tf.dtypes.cast(y_pred > 0.5, tf.float32)
 
-    for l, channel in zip(LABELS, range(OUT_CH)):
-        y_pred_ch = tf.reshape(y_pred[..., channel], [-1])
-        y_true_ch = tf.dtypes.cast(y_true == l, tf.float32)
+    if data_format == 'channels_last':
+        numer = 2.0 * tf.math.reduce_sum(y_true * y_pred, axis=(0, 1, 2, 3)) + eps
+        denom = tf.math.reduce_sum(y_true_ch ** 2, axis=(0, 1, 2, 3)) + \
+                tf.math.reduce_sum(y_pred_ch ** 2, axis=(0, 1, 2, 3)) + eps
+    elif data_format == 'channels_first':
+        numer = 2.0 * tf.math.reduce_sum(y_true * y_pred, axis=(0, 2, 3, 4)) + eps
+        denom = tf.math.reduce_sum(y_true_ch ** 2, axis=(0, 2, 3, 4)) + \
+                tf.math.reduce_sum(y_pred_ch ** 2, axis=(0, 2, 3, 4)) + eps
 
-        numer = 2.0 * tf.math.reduce_sum(y_true_ch * y_pred_ch) + eps
-        denom = tf.math.reduce_sum(y_true_ch ** 2) + tf.math.reduce_sum(y_pred_ch ** 2) + eps
-        dice_coeff[l] = numer / denom
-
-    if log:
-        return sum(dice_coeff.values()) / len(dice_coeff), dice_coeff
-        
-    return sum(dice_coeff.values()) / len(dice_coeff)
+    return tf.reduce_mean(numer / denom)
 
 
-def voxel_accuracy(y_pred, y_true, log=False):
+def voxel_accuracy(x, y_pred, y_true, log=False):
     """Returns voxel-wise accuracy of the prediction, excluding non-brain voxels.
 
         Args:
@@ -46,25 +47,21 @@ def voxel_accuracy(y_pred, y_true, log=False):
                 is a tumor, with one tumor per channel.
             y_pred: true segmentation label with 0 at non-tumor voxels
                 and the label number of a voxel with a corresponding tumor.
-            log: whether to output dictionary of voxel accuracies per channel.
 
         Returns:
         voxel_accuracy: average voxel-wise accuracy across all channels.
-            if log: voxel-wise accuracies per channel as well.
     """
-    y_pred = y_pred * tf.dtypes.cast(y_pred > 0.5, tf.float32)
-    n_brain_voxels = tf.reduce_sum(tf.dtypes.cast(y_true > 0, tf.float32))
+    n_brain_voxels = tf.reduce_sum(tf.dtypes.cast(x > 0, tf.float32))
+    n_non_brain_voxels = tf.reduce_sum(1.0 - tf.dtypes.cast(tf.dtypes.cast(x, tf.bool), tf.float32))
 
-    voxel_accuracy = {}
+    # Create binary mask for each label and corresponding channel.
+    labels = tf.reshape(tf.convert_to_tensor(LABELS, dtype=tf.float32), shape=(1, 1, 1, 1, -1))
+    labels = tf.broadcast_to(labels, y_true.shape)
+    y_true = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - labels, tf.bool), tf.float32)
 
-    for l, channel in zip(LABELS, range(OUT_CH)):
-        y_pred_ch = y_pred[..., channel]
-        y_true_ch = tf.dtypes.cast(y_true == l, tf.float32)
+    # Round probabilities >0.5 to 1 and <0.5 to 0.
+    y_pred = tf.dtypes.cast(y_pred > 0.5, tf.float32)
 
-        n_correct = tf.reduce_sum(tf.dtypes.cast((y_pred_ch - y_true_ch) == 0.0, tf.float32))
-        voxel_accuracy[l] = n_correct / n_brain_voxels
-    
-    if log:
-        return sum(voxel_accuracy.values()) / len(voxel_accuracy), voxel_accuracy
-
-    return sum(voxel_accuracy.values()) / len(voxel_accuracy)
+    # Find where true and pred match, but remove all voxels outside of the brain.
+    n_correct = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - y_pred, tf.bool), tf.float32) - n_non_brain_voxels
+    return n_correct / n_brain_voxels
