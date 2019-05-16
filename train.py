@@ -132,7 +132,7 @@ def main(args):
 
         # Write logs.
         if args.log_file:
-            with open(args.log, 'w') as f:
+            with open(args.log_file, 'w') as f:
                 f.write('{},{},{},{}\n'.format(
                         epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss))
 
