@@ -98,5 +98,37 @@ def train_parser():
 def test_parser():
     parser = argparse.ArgumentParser()
 
+    # Hardware.
+    parser.add_argument('--gpu', action='store_true', default=False,
+            help='Whether to use GPU on evaluation.')
+
+    # Data.
+    parser.add_argument('--test_folder', type=str, required=True,
+            help='Location of test set data.')
+    parser.add_arrgument('--data_format', type=str, default='channels_last',
+            choices=['channels_first', 'channels_last'],
+            help='Format of input data: `channel_first` or `channels_last`.')
+
     # Model path.
-    parser.add_argument('--chkpt')
+    parser.add_argument('--chkpt_file', type=str, required=True,
+            help='Path to weights dump of model training.')
+    parser.add_argument('--prepro_file', type=str, required=True,
+            help='Path to dumped preprocessed stats.')
+
+    # Model.
+    parser.add_argument('--conv_kernel_size', type=int, default=3,
+            help='Size of convolutional kernels throughout the model.')
+    parser.add_argument('--gn_groups', type=int, default=8,
+            help='Size of groups for group normalization.')
+    parser.add_argument('--dropout', type=float, default=0.2,
+            help='Dropout rate for dropout layer after initial convolution.')
+    parser.add_argument('--l2_scale', type=float, default=1e-5,
+            help='Scale of L2-regularization for convolution kernel weights.')
+
+    args = parser.parse_args()
+
+    if not args.gpu:
+        assert args.data_format == 'channels_last', \
+            'tf.keras.layers.Conv3D only supports `channels_last` input for CPU.'
+
+    return args
