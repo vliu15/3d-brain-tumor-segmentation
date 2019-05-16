@@ -35,8 +35,10 @@ def main(args):
     # Load data.
     train_data, n_train = prepare_dataset(args.train_loc, args.batch_size)
     val_data, n_val = prepare_dataset(args.val_loc, args.batch_size)
+    print('{} training examples.'.format(n_train))
+    print('{} validation examples.'.format(n_val))
 
-    # Set up.
+    # Initialize model, optimizer, and loss trackers.
     model = VolumetricCNN(
                         data_format=args.data_format,
                         kernel_size=args.conv_kernel_size,
@@ -44,20 +46,27 @@ def main(args):
                         dropout=args.dropout,
                         kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
     optimizer = ScheduledAdam(learning_rate=args.lr)
-
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
 
-    print('{} training examples.'.format(n_train))
-    print('{} validation examples.'.format(n_val))
-
+    # Load model weights if specified.
+    if args.load_file:
+        model.load_weights(args.load_file)
+    
+    # Set up logging.
     if args.log_file:
         with open(args.log, 'w') as f:
             f.write('epoch,lr,train_loss,val_loss\n')
 
+    best_val_loss = float('inf')
+    patience = 0
+
     # Train.
     for epoch in range(args.n_epochs):
         print('Epoch {}.'.format(epoch))
+
+        # Schedule learning rate.
+        optimizer.update_lr(epoch_num=epoch)
 
         # Training epoch.
         for step, batch in tqdm(enumerate(train_data, 1), total=n_train):
@@ -70,8 +79,6 @@ def main(args):
             elif args.data_format == 'channels_first':
                 x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
                 y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
-
-            optimizer.update_lr(epoch_num=epoch)
 
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
@@ -114,7 +121,7 @@ def main(args):
                 y_pred, y_vae, z_mean, z_logvar = model(x_batch)
                 loss = myrnenko_loss(
                                      x_batch, y_batch, y_pred, y_vae, z_mean,
-                                     z_logvar, data_format=args.data_formate)
+                                     z_logvar, data_format=args.data_format)
                 loss += sum(model.losses)
 
                 val_loss.update_state(loss)
@@ -128,6 +135,19 @@ def main(args):
             with open(args.log, 'w') as f:
                 f.write('{},{},{},{}\n'.format(
                         epoch, optimizer.learning_rate, avg_train_loss, avg_val_loss))
+
+        # Checkpoint and patience.
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            model.save_weights(args.save_file)
+            patience = 0
+            print('Saved model weights.')
+        elif patience == args.patience:
+            print('Validation loss has not improved in {} epochs. Stopped training'
+                    .format(args.patience))
+            break
+        else:
+            patience += 1
 
 
 if __name__ == '__main__':

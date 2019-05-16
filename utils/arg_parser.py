@@ -51,16 +51,25 @@ def train_parser():
             help='Format of input data: `channel_first` or `channels_last`.')
 
     # Training.
+    parser.add_argument('--log_file', type=str, default='train.log',
+            help='File for output logs.')
+    parser.add_argument('--log_steps', type=int, default=100,
+            help='Number of steps to output progress.')
+    parser.add_argument('--save_file', type=str, default='chkpt.hdf5',
+            help='File path to save best checkpoint.')
+    parser.add_arggument('--load_file', type=str, default='',
+            help='File path to load weights.')
+    parser.add_argument('--patience', type=int, default=10,
+            help='Number of epochs if validation scores have not improved \
+                  before stopping training')
+
+    # Optimization.
     parser.add_argument('--n_epochs', type=int, default=300,
             help='Total number of epochs to train for.')
     parser.add_argument('--lr', type=float, default=1e-4,
             help='Initial learning rate of Adam optimizer.')
     parser.add_argument('--batch_size', type=int, default=1,
             help='Batch size to be used in training.')
-    parser.add_argument('--log_file', type=str, default='',
-            help='File for output logs.')
-    parser.add_argument('--log_steps', type=int, default=100,
-            help='Number of steps to output progress.')
 
     # Model.
     parser.add_argument('--conv_kernel_size', type=int, default=3,
