@@ -19,7 +19,7 @@ def cross_entropy_loss(y_true, y_pred, smoothing=0.01, data_format='channels_las
     # Apply label smoothing if necessary.
     if smoothing:
         y_true -= smoothing * tf.cast(tf.cast(y_true > 0, tf.bool), tf.float32)
-        smoothing /= OUT_CH - 1
+        smoothing /= (OUT_CH - 1)
         y_true += smoothing * tf.cast(tf.cast(y_true < 1, tf.bool), tf.float32)
 
     axis = -1 if data_format == 'channels_last' else 1
