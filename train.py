@@ -168,12 +168,12 @@ def main(args):
             with open(args.log_file, 'a') as f:
                 entry = ','.join([str(epoch),
                                   str(optimizer.learning_rate.numpy()),
-                                  str(train_loss.result()),
-                                  str(train_voxel_accu.result()),
-                                  str(train_dice_coeff.result()),
-                                  str(val_loss.result()),
-                                  str(val_voxel_accu.result()),
-                                  str(val_dice_coeff.result())])
+                                  str(train_loss.result().numpy()),
+                                  str(train_voxel_accu.result().numpy()),
+                                  str(train_dice_coeff.result().numpy()),
+                                  str(val_loss.result().numpy()),
+                                  str(val_voxel_accu.result().numpy()),
+                                  str(val_dice_coeff.result().numpy())])
                 f.write(entry + '\n')
 
         # Checkpoint and patience.
