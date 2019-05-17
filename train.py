@@ -176,17 +176,9 @@ def main(args):
                                   str(val_dice_coeff.result())])
                 f.write(entry + '\n')
 
-        # Reset statistics.
-        train_loss.reset_states()
-        train_voxel_accu.reset_states()
-        train_dice_coeff.reset_states()
-        val_loss.reset_states()
-        val_voxel_accu.reset_states()
-        val_dice_coeff.reset_states()
-
         # Checkpoint and patience.
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
+        if val_loss.result() < best_val_loss:
+            best_val_loss = val_loss.result()
             model.save_weights(args.save_file)
             patience = 0
             print('Saved model weights.')
@@ -196,6 +188,14 @@ def main(args):
             break
         else:
             patience += 1
+
+        # Reset statistics.
+        train_loss.reset_states()
+        train_voxel_accu.reset_states()
+        train_dice_coeff.reset_states()
+        val_loss.reset_states()
+        val_voxel_accu.reset_states()
+        val_dice_coeff.reset_states()
 
 
 if __name__ == '__main__':
