@@ -57,7 +57,6 @@ def segmentation_accuracy(x, y_pred, y_true, data_format='channels_last'):
 
     # Create binary mask for each label and corresponding channel.
     labels = tf.reshape(tf.convert_to_tensor(LABELS, dtype=tf.float32), shape=shape)
-    labels = tf.broadcast_to(labels, y_true.shape)
     y_true = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - labels, tf.bool), tf.float32)
 
     # Round probabilities >0.5 to 1 and <0.5 to 0.
