@@ -14,6 +14,18 @@ def kullbach_liebler_loss(z_mean, z_logvar, n_voxels):
                 z_mean ** 2 + tf.math.exp(z_logvar) - z_logvar - 1.0)
 
 
+def cross_entropy_loss(y_true, y_pred, smoothing=0.01, data_format='channels_last'):
+    """Returns categorical cross entropy loss between predicted and true distributions."""
+    # Apply label smoothing if necessary.
+    if smoothing:
+        y_true -= smoothing * tf.cast(tf.cast(y_true > 0, tf.bool), tf.float32)
+        smoothing /= OUT_CH - 1
+        y_true += smoothing * tf.cast(tf.cast(y_true < 1, tf.bool), tf.float32)
+
+    axis = -1 if data_format == 'channels_last' else 1
+    return tf.keras.backend.categorical_crossentropy(y_true, y_pred, axis=axis)
+
+
 def generalized_dice_loss(y_true, y_pred, data_format='channels_last', eps=1e-8):
     """Returns generalized dice loss between target and prediction.
     
