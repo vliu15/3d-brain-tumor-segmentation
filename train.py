@@ -34,10 +34,10 @@ def prepare_dataset(path, batch_size):
 
 def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_last'):
     loss = myrnenko_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
-    brain_accu, net_accu = segmentation_accuracy(x, y_pred, y_true, data_format=data_format)
+    voxel_accu = segmentation_accuracy(x, y_pred, y_true, data_format=data_format)
     dice_coeff = dice_coefficient(y_pred, y_true, data_format=data_format)
 
-    return loss, brain_accu, net_accu, dice_coeff
+    return loss, voxel_accu, dice_coeff
 
 
 def main(args):
@@ -58,12 +58,10 @@ def main(args):
 
     # Initialize loss, accuracies, and dice coefficients.
     train_loss = tf.keras.metrics.Mean(name='train_loss')
-    train_brain_accu = tf.keras.metrics.Mean(name='train_brain_accu')
-    train_net_accu = tf.keras.metrics.Mean(name='train_net_accu')
+    train_voxel_accu = tf.keras.metrics.Mean(name='train_voxel_accu')
     train_dice_coeff = tf.keras.metrics.Mean(name='train_dice_coeff')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
-    val_brain_accu = tf.keras.metrics.Mean(name='val_brain_accu')
-    val_net_accu = tf.keras.metrics.Mean(name='val_net_accu')
+    val_voxel_accu = tf.keras.metrics.Mean(name='val_voxel_accu')
     val_dice_coeff = tf.keras.metrics.Mean(name='val_dice_coeff')
 
     # Load model weights if specified.
@@ -76,12 +74,10 @@ def main(args):
             header = ','.join(['epoch',
                                'lr',
                                'train_loss',
-                               'train_brain_accu',
-                               'train_net_accu',
+                               'train_voxel_accu',
                                'train_dice_coeff',
                                'val_loss',
-                               'val_brain_accu',
-                               'val_net_accu,',
+                               'val_voxel_accu',
                                'val_dice_coeff'])
             f.write(header + '\n')
 
@@ -111,10 +107,10 @@ def main(args):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
                     y_pred, y_vae, z_mean, z_logvar = model(x_batch, training=True)
-                    loss, brain_accu, net_accu, dice_coeff = evaluate(
-                                                                x_batch, y_batch, y_pred,
-                                                                y_vae, z_mean, z_logvar,
-                                                                data_format=args.data_format)
+                    loss, voxel_accu, dice_coeff = evaluate(
+                                                        x_batch, y_batch, y_pred,
+                                                        y_vae, z_mean, z_logvar,
+                                                        data_format=args.data_format)
                     loss += sum(model.losses)
 
                 # Gradients and backward.
@@ -122,24 +118,19 @@ def main(args):
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 train_loss.update_state(loss)
-                train_brain_accu.update_state(brain_accu)
-                train_net_accu.update_state(net_accu)
+                train_voxel_accu.update_state(voxel_accu)
                 train_dice_coeff.update_state(dice_coeff)
 
             # Output loss to console.
             if step % args.log_steps == 0:
-                print('Step {}. Loss: {l: .4f}, Brain Accu: {b: 3.3f}, \
-                       Net Accu: {n: 3.3f}, Dice Coeff: {d: 0.4f}.'
+                print('Step {}. Loss: {l: .4f}, Voxel Accu: {v: 3.3f}, Dice Coeff: {d: 0.4f}.'
                        .format(step, l=train_loss.result(),
-                                     b=train_brain_accu.result()*100,
-                                     n=train_net_accu.result()*100,
+                                     v=train_voxel_accu.result()*100,
                                      d=train_dice_coeff.result()))
 
-        print('Training. Loss: {l: .4f}, Brain Accu: {b: 3.3f}, \
-               Net Accu: {n: 3.3f}, Dice Coeff: {d: 0.4f}.'
+        print('Training. Loss: {l: .4f}, Voxel Accu: {v: 3.3f}, Dice Coeff: {d: 0.4f}.'
                .format(l=train_loss.result(),
-                       b=train_brain_accu.result()*100,
-                       n=train_net_accu.result()*100,
+                       v=train_voxel_accu.result()*100,
                        d=train_dice_coeff.result()))
 
         # Validation epoch.
@@ -157,22 +148,19 @@ def main(args):
             with tf.device(args.device):
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_logvar = model(x_batch, training=False)
-                loss, brain_accu, net_accu, dice_coeff = evaluate(
-                                                            x_batch, y_batch, y_pred,
-                                                            y_vae, z_mean, z_logvar,
-                                                            data_format=args.data_format)
+                loss, voxel_accu, dice_coeff = evaluate(
+                                                    x_batch, y_batch, y_pred,
+                                                    y_vae, z_mean, z_logvar,
+                                                    data_format=args.data_format)
                 loss += sum(model.losses)
 
                 val_loss.update_state(loss)
-                val_brain_accu.update_state(brain_accu)
-                val_net_accu.update_state(net_accu)
+                val_voxel_accu.update_state(voxel_accu)
                 val_dice_coeff.update_state(dice_coeff)
 
-        print('Validation. Loss: {l: .4f}, Brain Accu: {b: 3.3f}, \
-               Net Accu: {n: 3.3f}, Dice Coeff: {d: 0.4f}.'
+        print('Validation. Loss: {l: .4f}, Voxel Accu: {v: 3.3f}, Dice Coeff: {d: 0.4f}.'
                .format(l=val_loss.result(),
-                       b=val_brain_accu.result()*100,
-                       n=val_net_accu.result()*100,
+                       v=val_voxel_accu.result()*100,
                        d=val_dice_coeff.result()))
 
         # Write logs.
@@ -181,23 +169,19 @@ def main(args):
                 entry = ','.join([epoch,
                                   optimizer.learning_rate.numpy(),
                                   train_loss.result(),
-                                  train_brain_accu.result(),
-                                  train_net_accu.result(),
+                                  train_voxel_accu.result(),
                                   train_dice_coeff.result(),
                                   val_loss.result(),
-                                  val_brain_accu.result(),
-                                  val_net_accu.result(),
+                                  val_voxel_accu.result(),
                                   val_dice_coeff.result()])
                 f.write(entry + '\n')
 
         # Reset statistics.
         train_loss.reset_states()
-        train_brain_accu.reset_states()
-        train_net_accu.reset_states()
+        train_voxel_accu.reset_states()
         train_dice_coeff.reset_states()
         val_loss.reset_states()
-        val_brain_accu.reset_states()
-        val_net_accu.reset_states()
+        val_voxel_accu.reset_states()
         val_dice_coeff.reset_states()
 
         # Checkpoint and patience.

@@ -48,11 +48,9 @@ def segmentation_accuracy(x, y_pred, y_true, data_format='channels_last'):
                 or `channels_first`.
 
         Returns:
-            Brain voxel accuracy: average voxel-wise accuracy across brain voxels.
-            Net voxel accuracy: average voxel-wise accuracy across all voxels.
+             Voxel accuracy: average voxel-wise accuracy across all voxels.
     """
-    n_brain_voxels = tf.reduce_sum(tf.dtypes.cast(x > 0, tf.float32))
-    n_non_brain_voxels = tf.reduce_sum(1.0 - tf.dtypes.cast(tf.dtypes.cast(x, tf.bool), tf.float32))
+    n_voxels = tf.math.reduce_prod(x.shape)
     shape = (1, 1, 1, 1, -1) if data_format == 'channels_last' else (1, -1, 1, 1, 1)
 
     # Create binary mask for each label and corresponding channel.
@@ -64,4 +62,4 @@ def segmentation_accuracy(x, y_pred, y_true, data_format='channels_last'):
 
     # Find where true and pred match, but remove all voxels outside of the brain.
     n_correct = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - y_pred, tf.bool), tf.float32)
-    return (n_correct - n_non_brain_voxels) / n_brain_voxels, n_correct / n_brain_voxels
+    return n_correct / n_voxels
