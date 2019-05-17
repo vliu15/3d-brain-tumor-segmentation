@@ -6,6 +6,7 @@ from utils.arg_parser import train_parser
 from utils.loss import myrnenko_loss
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
+from utils.metrics import dice_coefficient, segmentation_accuracy
 from model.volumetric_cnn import VolumetricCNN
 
 
@@ -31,6 +32,14 @@ def prepare_dataset(path, batch_size):
     return dataset, get_dataset_len(dataset)
 
 
+def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_last'):
+    loss = myrnenko_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
+    brain_accu, net_accu = segmentation_accuracy(x, y_pred, y_true, data_format=data_format)
+    dice_coeff = dice_coefficient(y_pred, y_true, data_format=data_format)
+
+    return loss, brain_accu, net_accu, dice_coeff
+
+
 def main(args):
     # Load data.
     train_data, n_train = prepare_dataset(args.train_loc, args.batch_size)
@@ -38,7 +47,7 @@ def main(args):
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
 
-    # Initialize model, optimizer, and loss trackers.
+    # Initialize model and optimizer
     model = VolumetricCNN(
                         data_format=args.data_format,
                         kernel_size=args.conv_kernel_size,
@@ -46,8 +55,16 @@ def main(args):
                         dropout=args.dropout,
                         kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
     optimizer = ScheduledAdam(learning_rate=args.lr)
+
+    # Initialize loss, accuracies, and dice coefficients.
     train_loss = tf.keras.metrics.Mean(name='train_loss')
+    train_brain_accu = tf.keras.metrics.Mean(name='train_brain_accu')
+    train_net_accu = tf.keras.metrics.Mean(name='train_net_accu')
+    train_dice_coeff = tf.keras.metrics.Mean(name='train_dice_coeff')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
+    val_brain_accu = tf.keras.metrics.Mean(name='val_brain_accu')
+    val_net_accu = tf.keras.metrics.Mean(name='val_net_accu')
+    val_dice_coeff = tf.keras.metrics.Mean(name='val_dice_coeff')
 
     # Load model weights if specified.
     if args.load_file:
@@ -56,7 +73,17 @@ def main(args):
     # Set up logging.
     if args.log_file:
         with open(args.log_file, 'w') as f:
-            f.write('epoch,lr,train_loss,val_loss\n')
+            header = ','.join(['epoch',
+                               'lr',
+                               'train_loss',
+                               'train_brain_accu',
+                               'train_net_accu',
+                               'train_dice_coeff',
+                               'val_loss',
+                               'val_brain_accu',
+                               'val_net_accu,',
+                               'val_dice_coeff'])
+            f.write(header + '\n')
 
     best_val_loss = float('inf')
     patience = 0
@@ -84,9 +111,10 @@ def main(args):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
                     y_pred, y_vae, z_mean, z_logvar = model(x_batch, training=True)
-                    loss = myrnenko_loss(
-                                         x_batch, y_batch, y_pred, y_vae, z_mean,
-                                         z_logvar, data_format=args.data_format)
+                    loss, brain_accu, net_accu, dice_coeff = evaluate(
+                                                                x_batch, y_batch, y_pred,
+                                                                y_vae, z_mean, z_logvar,
+                                                                data_format=args.data_format)
                     loss += sum(model.losses)
 
                 # Gradients and backward.
@@ -94,15 +122,25 @@ def main(args):
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 train_loss.update_state(loss)
+                train_brain_accu.update_state(brain_accu)
+                train_net_accu.update_state(net_accu)
+                train_dice_coeff.update_state(dice_coeff)
 
             # Output loss to console.
             if step % args.log_steps == 0:
-                print('Step {}. Cumulative average loss: {}'
-                    .format(step, train_loss.result() / step))
+                print('Step {}. Loss: {l: .4f}, Brain Accu: {b: 3.3f}, \
+                       Net Accu: {n: 3.3f}, Dice Coeff: {d: 0.4f}.'
+                       .format(step, l=train_loss.result(),
+                                     b=train_brain_accu.result()*100,
+                                     n=train_net_accu.result()*100,
+                                     d=train_dice_coeff.result()))
 
-        avg_train_loss = train_loss.result() / n_train
-        train_loss.reset_states()
-        print('Average training loss: {}.'.format(avg_train_loss))
+        print('Training. Loss: {l: .4f}, Brain Accu: {b: 3.3f}, \
+               Net Accu: {n: 3.3f}, Dice Coeff: {d: 0.4f}.'
+               .format(l=train_loss.result(),
+                       b=train_brain_accu.result()*100,
+                       n=train_net_accu.result()*100,
+                       d=train_dice_coeff.result()))
 
         # Validation epoch.
         for step, batch in tqdm(enumerate(val_data), total=n_val):
@@ -119,22 +157,48 @@ def main(args):
             with tf.device(args.device):
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_logvar = model(x_batch, training=False)
-                loss = myrnenko_loss(
-                                     x_batch, y_batch, y_pred, y_vae, z_mean,
-                                     z_logvar, data_format=args.data_format)
+                loss, brain_accu, net_accu, dice_coeff = evaluate(
+                                                            x_batch, y_batch, y_pred,
+                                                            y_vae, z_mean, z_logvar,
+                                                            data_format=args.data_format)
                 loss += sum(model.losses)
 
                 val_loss.update_state(loss)
+                val_brain_accu.update_state(brain_accu)
+                val_net_accu.update_state(net_accu)
+                val_dice_coeff.update_state(dice_coeff)
 
-        avg_val_loss = val_loss.result() / n_val
-        val_loss.reset_states()
-        print('Average validation loss: {}'.format(avg_val_loss))
+        print('Validation. Loss: {l: .4f}, Brain Accu: {b: 3.3f}, \
+               Net Accu: {n: 3.3f}, Dice Coeff: {d: 0.4f}.'
+               .format(l=val_loss.result(),
+                       b=val_brain_accu.result()*100,
+                       n=val_net_accu.result()*100,
+                       d=val_dice_coeff.result()))
 
         # Write logs.
         if args.log_file:
             with open(args.log_file, 'a') as f:
-                f.write('{},{},{},{}\n'.format(
-                        epoch, optimizer.learning_rate.numpy(), avg_train_loss, avg_val_loss))
+                entry = ','.join([epoch,
+                                  optimizer.learning_rate.numpy(),
+                                  train_loss.result(),
+                                  train_brain_accu.result(),
+                                  train_net_accu.result(),
+                                  train_dice_coeff.result(),
+                                  val_loss.result(),
+                                  val_brain_accu.result(),
+                                  val_net_accu.result(),
+                                  val_dice_coeff.result()])
+                f.write(entry + '\n')
+
+        # Reset statistics.
+        train_loss.reset_states()
+        train_brain_accu.reset_states()
+        train_net_accu.reset_states()
+        train_dice_coeff.reset_states()
+        val_loss.reset_states()
+        val_brain_accu.reset_states()
+        val_net_accu.reset_states()
+        val_dice_coeff.reset_states()
 
         # Checkpoint and patience.
         if avg_val_loss < best_val_loss:
@@ -143,7 +207,7 @@ def main(args):
             patience = 0
             print('Saved model weights.')
         elif patience == args.patience:
-            print('Validation loss has not improved in {} epochs. Stopped training'
+            print('Validation loss has not improved in {} epochs. Stopped training.'
                     .format(args.patience))
             break
         else:
