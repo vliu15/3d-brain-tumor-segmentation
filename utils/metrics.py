@@ -36,7 +36,7 @@ def dice_coefficient(y_pred, y_true, eps=1e-8, data_format='channels_last'):
     return tf.reduce_mean(numer / denom)
 
 
-def segmentation_accuracy(x, y_pred, y_true, data_format='channels_last'):
+def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
     """Returns voxel-wise accuracy of the prediction, excluding non-brain voxels.
 
         Args:
@@ -50,7 +50,7 @@ def segmentation_accuracy(x, y_pred, y_true, data_format='channels_last'):
         Returns:
              Voxel accuracy: average voxel-wise accuracy across all voxels.
     """
-    n_voxels = tf.dtypes.cast(tf.math.reduce_prod(x.shape), tf.float32)
+    n_voxels = tf.dtypes.cast(tf.math.reduce_prod(y_true.shape), tf.float32)
     shape = (1, 1, 1, 1, -1) if data_format == 'channels_last' else (1, -1, 1, 1, 1)
 
     # Create binary mask for each label and corresponding channel.
@@ -60,6 +60,6 @@ def segmentation_accuracy(x, y_pred, y_true, data_format='channels_last'):
     # Round probabilities >0.5 to 1 and <0.5 to 0.
     y_pred = tf.dtypes.cast(y_pred > 0.5, tf.float32)
 
-    # Find where true and pred match, but remove all voxels outside of the brain.
+    # Find where true and pred match.
     n_correct = 1.0 - tf.dtypes.cast(tf.dtypes.cast(y_true - y_pred, tf.bool), tf.float32)
-    return n_correct / n_voxels
+    return tf.reduce_sum(n_correct) / n_voxels
