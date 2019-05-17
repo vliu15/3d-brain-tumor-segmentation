@@ -37,7 +37,7 @@ def prepare_dataset(path, batch_size):
 def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_last'):
     # Convert correct labels to one-hot encodings per voxel.
     axis = -1 if data_format == 'channels_last' else 1
-    y_true = tf.one_hot(tf.squeeze(y_true, axis=axis), len(LABELS), axis=axis)
+    y_true = tf.one_hot(tf.squeeze(y_true, axis=axis), len(LABELS), axis=axis, dtype=tf.float32)
 
     loss = myrnenko_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
     voxel_accu = segmentation_accuracy(y_pred, y_true, data_format=data_format)
@@ -104,10 +104,10 @@ def main(args):
             y_batch = batch['y']
             if args.data_format == 'channels_last':
                 x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE).astype(np.int32)
             elif args.data_format == 'channels_first':
                 x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE).astype(np.int32)
 
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
