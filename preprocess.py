@@ -52,7 +52,7 @@ def create_dataset(brats_folder, data_format='channels_last'):
             y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=axis)
 
             # Replace label 4 with 3 for softmax labels at output time.
-            y_example = np.place(y_example, y_example >= 4, [3])
+            np.place(y_example, y_example >= 4, [3])
 
         X.append(X_example)
         y.append(y_example)
