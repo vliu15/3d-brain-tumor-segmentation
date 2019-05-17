@@ -66,6 +66,7 @@ def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
     # Extract predictions at each voxel.
     y_pred = tf.argmax(y_pred, axis=axis)
     y_pred = tf.expand_dims(y_pred, axis=axis)
+    y_pred = tf.cast(y_pred, tf.float32)
 
     # Correct predictions will have 0, else 1.
     correct = tf.cast(tf.cast(y_pred - y_true, tf.bool), tf.float32)
