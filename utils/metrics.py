@@ -4,7 +4,7 @@ from utils.constants import *
 
 
 def dice_coefficient(y_pred, y_true, eps=1e-8,
-                     data_format='channels_last', include_non_brain=True):
+                     data_format='channels_last', include_non_brain=False):
     """Returns dice coefficient between predicted and true outputs.
 
         Args:
@@ -21,10 +21,10 @@ def dice_coefficient(y_pred, y_true, eps=1e-8,
     """
     # Extract predictions at each voxel.
     axis = -1 if data_format == 'channels_last' else 1
-    y_pred = tf.argmax(y_pred, axis=axis)
+    y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
 
     # Turn into one-hot encodings per voxel.
-    y_pred = tf.one_hot(y_pred, len(LABELS), axis=axis)
+    y_pred = tf.one_hot(y_pred, len(LABELS), axis=axis, dtype=tf.float32)
 
     # Correct predictions will have 1, else 0.
     intersection = y_pred * y_true
@@ -40,7 +40,7 @@ def dice_coefficient(y_pred, y_true, eps=1e-8,
     # Dice coefficients per channel
     dice_coeff = (2.0 * intersection + eps) / (true_voxels + pred_voxels + eps)
 
-    if include_brain_onl:
+    if include_non_brain:
         return (tf.reduce_mean(dice_coeff), tf.reduce_mean(dice_coeff[1:]))
     else:
         return tf.reduce_mean(dice_coeff)
@@ -60,10 +60,12 @@ def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
         Returns:
              Voxel accuracy: average voxel-wise accuracy across all voxels.
     """
+    axis = -1 if data_format == 'channels_last' else 1
     total_voxels = tf.cast(tf.reduce_prod(y_true.shape), tf.float32)
 
     # Extract predictions at each voxel.
     y_pred = tf.argmax(y_pred, axis=axis)
+    y_pred = tf.expand_dims(y_pred, axis=axis)
 
     # Correct predictions will have 0, else 1.
     correct = tf.cast(tf.cast(y_pred - y_true, tf.bool), tf.float32)
