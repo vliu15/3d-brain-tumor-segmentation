@@ -5,6 +5,9 @@ RTOG_MODALITIES = ['t1c', 'flair']
 BRATS_MODALITIES = ['t1ce', 'flair']
 TRUTH = 'seg'
 
+# LABELS      =       [1, 2, 4]
+LABELS      =       [0, 1, 2, 3]
+
 # Data.
 RAW_H    =  240                     # Height of raw image.
 RAW_W    =  240                     # Width of raw image.
@@ -13,8 +16,8 @@ H        =  128                     # Target height of preprocessed image.
 W        =  128                     # Target width of preprocessed image.
 D        =  128                     # Target depth of preprocessed image.
 
-IN_CH    =  len(BRATS_MODALITIES)     # Number of input channels.
-OUT_CH   =  3                       # Number of output channels.
+IN_CH    =  len(BRATS_MODALITIES)   # Number of input channels.
+OUT_CH   =  len(LABELS)             # Number of output channels.
 
 CHANNELS_FIRST_X_SHAPE     =   (-1, IN_CH, H, W, D)
 CHANNELS_FIRST_Y_SHAPE     =   (-1, 1, H, W, D)
@@ -59,8 +62,6 @@ VAE_CONV_BLOCK1_SIZE        =       32                      # Number of filters 
 VAE_CONV_BLOCK0_SIZE        =       16                      # Number of filters in zeroth conv block.
 
 # Loss.
-LABELS      =       [1, 2, 4]
-
 GDL_WEIGHT  =       1.0
 SS_WEIGHT   =       1.0
 L2_WEIGHT   =       0.1

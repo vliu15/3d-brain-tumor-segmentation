@@ -128,7 +128,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 padding='same',
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
-                                activation='sigmoid')
+                                activation='softmax')
 
     def call(self, enc_outs):
         """Returns the forward pass of the ConvDecoder.

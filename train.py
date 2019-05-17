@@ -33,6 +33,10 @@ def prepare_dataset(path, batch_size):
 
 
 def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_last'):
+    # Convert correct labels to one-hot encodings per voxel.
+    axis = -1 if data_format == 'channels_last' else 1
+    y_true = tf.one_hot(tf.squeeze(y_true, axis=axis), len(LABELS), axis=axis)
+
     loss = myrnenko_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
     voxel_accu = segmentation_accuracy(y_pred, y_true, data_format=data_format)
     dice_coeff = dice_coefficient(y_pred, y_true, data_format=data_format)

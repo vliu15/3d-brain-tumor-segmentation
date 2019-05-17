@@ -42,15 +42,18 @@ def create_dataset(brats_folder, data_format='channels_last'):
 
         # Create corresponding output folder.
         if os.path.isdir(subject_folder):
-            if data_format == 'channels_last':
-                X_example = np.stack(
-                    [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=-1)
-                y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=-1)
-            elif data_format == 'channels_first':
-                X_example = np.stack(
-                    [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=0)
-                y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=0)
-        
+            axis = -1 if data_format == 'channels_last' else 0
+
+            # Stack modalities in channel dimension.
+            X_example = np.stack(
+                [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=axis)
+
+            # Expand channels (1 channel).
+            y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=axis)
+
+            # Replace label 4 with 3 for softmax labels at output time.
+            y_example = np.place(y_example, y_example >= 4, [3])
+
         X.append(X_example)
         y.append(y_example)
 
@@ -81,10 +84,8 @@ def create_splits(X, y):
 
 def compute_train_norm(X_train, data_format='channels_last'):
     """Returns mean and standard deviation per channel for training inputs."""
-    if data_format == 'channels_last':
-        X_train = X_train.transpose(4, 0, 1, 2, 3).reshape(IN_CH, -1)
-    elif data_format == 'channels_first':
-        X_train = X_train.transpose(1, 0, 2, 3, 4).reshape(IN_CH, -1)
+    transpose_order = (4, 0, 1, 2, 3) if data_format == 'channels_last' else (1, 0, 2, 3, 4)
+    X_train = X_train.transpose(*transpose_order).reshape(IN_CH, -1)
 
     # Compute mean and std for each channel
     voxel_mean = np.zeros(IN_CH)
@@ -99,12 +100,9 @@ def compute_train_norm(X_train, data_format='channels_last'):
 def normalize(voxel_mean, voxel_std, X, shard_size, data_format='channels_last'):
     """Normalizes an array of features X given voxel-wise mean and std."""
     # Reshape mean and std into broadcastable with X, then loop per channel to avoid OOM.
-    if data_format == 'channels_last':
-        voxel_mean = voxel_mean.reshape(1, 1, 1, 1, IN_CH)
-        voxel_std = voxel_std.reshape(1, 1, 1, 1, IN_CH)
-    elif data_format == 'channels_first':
-        voxel_mean = voxel_mean.reshape(1, IN_CH, 1, 1, 1)
-        voxel_std = voxel_std.reshape(1, IN_CH, 1, 1, 1)
+    shape = (1, 1, 1, 1, IN_CH) if data_format == 'channels_last' else (1, IN_CH, 1, 1, 1)
+    voxel_mean = voxel_mean.reshape(*shape)
+    voxel_std = voxel_std.reshape(*shape)
 
     num_shards = X.shape[0] // shard_size + 1
     for shard in tqdm(range(num_shards)):
@@ -118,12 +116,9 @@ def normalize(voxel_mean, voxel_std, X, shard_size, data_format='channels_last')
 def intensify(shifts, scales, X, shard_size, data_format='channels_last'):
     """Applies intensity shifting and scaling on X given shift and scale values."""
     # Reshape shifts and scales into broadcastable with X, then loop per channel to avoid OOM.
-    if data_format == 'channels_last':
-        shifts = shifts.reshape(1, 1, 1, 1, IN_CH)
-        scales = scales.reshape(1, 1, 1, 1, IN_CH)
-    elif data_format == 'channels_first':
-        shifts = shifts.reshape(1, IN_CH, 1, 1, 1)
-        scales = scales.reshape(1, IN_CH, 1, 1, 1)
+    shape = (1, 1, 1, 1, IN_CH) if data_format == 'channels_last' else (1, IN_CH, 1, 1, 1)
+    shifts = shifts.reshape(*shape)
+    scales = scales.reshape(*shape)
 
     num_shards = X.shape[0] // shard_size + 1
     for shard in tqdm(range(num_shards)):
@@ -147,6 +142,7 @@ def example_to_tfrecords(X, y, writer):
 
 def sample_crop(X, y, data_format='channels_last'):
     """Returns the crop of one (X, y) example."""
+    # Sample corner points.
     h = np.random.randint(H, RAW_H)
     w = np.random.randint(W, RAW_W)
     d = np.random.randint(D, RAW_D)
@@ -154,7 +150,7 @@ def sample_crop(X, y, data_format='channels_last'):
     if data_format == 'channels_last':
         X = X[h-H:h, w-W:w, d-D:d, :]
         y = y[h-H:h, w-W:w, d-D:d, :]
-    elif data_format == 'channels_first':
+    else:
         X = X[:, h-H:h, w-W:w, d-D:d]
         y = y[:, h-H:h, w-W:w, d-D:d]
         
@@ -226,12 +222,9 @@ def main(args):
     for X, y in tqdm(zip(X_train, y_train)):
         # Augment.
         if np.random.uniform() < args.mirror_prob:
-            if args.data_format == 'channels_last':
-                X_augment = np.flip(X, axis=(1, 2, 3))
-                y_augment = np.flip(y, axis=(1, 2, 3))
-            elif args.data_format == 'channels_first':
-                X_augment = np.flip(X, axis=(2, 3, 4))
-                y_augment = np.flip(y, axis=(2, 3, 4))
+            axis = (1, 2, 3) if args.data_format == 'channels_last' else (2, 3, 4)
+            X_augment = np.flip(X, axis=axis)
+            y_augment = np.flip(y, axis=axis)
 
             # Write augmented crops to TFRecord.
             for _ in range(args.n_crops):
