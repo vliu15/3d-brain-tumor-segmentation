@@ -50,7 +50,7 @@ def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
         Returns:
              Voxel accuracy: average voxel-wise accuracy across all voxels.
     """
-    n_voxels = tf.dtypes.cast(tf.math.reduce_prod(y_true.shape), tf.float32)
+    n_voxels = tf.dtypes.cast(tf.math.reduce_prod(y_pred.shape), tf.float32)
     shape = (1, 1, 1, 1, -1) if data_format == 'channels_last' else (1, -1, 1, 1, 1)
 
     # Create binary mask for each label and corresponding channel.
