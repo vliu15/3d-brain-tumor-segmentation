@@ -81,7 +81,7 @@ def sensitivity(y_pred, y_true, data_format='channels_last'):
     # Extract predictions at each voxel.
     axis = -1 if data_format == 'channels_last' else 1
     y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
-,
+
     # Turn into one-hot encodings per voxel.
     y_pred = tf.one_hot(y_pred, len(LABELS), axis=axis, dtype=tf.float32)
 
