@@ -3,9 +3,6 @@ import tensorflow as tf
 from utils.constants import *
 
 
-def get_eval_scores()
-
-
 def dice_coefficient(y_pred, y_true, eps=1e-8,
                      data_format='channels_last', include_non_brain=False):
     """Returns dice coefficient between predicted and true outputs.
