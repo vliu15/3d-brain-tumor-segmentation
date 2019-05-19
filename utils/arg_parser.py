@@ -25,9 +25,9 @@ def prepro_parser():
             help='Scale of intensity shift to apply per channel after normalization.')
     parser.add_argument('--intensity_scale', type=float, default=0.1,
             help='Epsilon (from 1.0) of intensity scaling per channel.')
-    parser.add_argument('--mirror_prob', type=float, default=0.75,
+    parser.add_argument('--mirror_prob', type=float, default=0.5,
             help='Probability that each inputs are flipped across all 3 axes.')
-    parser.add_argument('--n_crops', type=int, default=3,
+    parser.add_argument('--n_crops', type=int, default=2,
             help='Number of random crops to sample per image.')
 
     args = parser.parse_args()
