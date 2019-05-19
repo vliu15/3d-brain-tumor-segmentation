@@ -4,7 +4,7 @@ from utils.constants import *
 
 
 def dice_coefficient(y_true, y_pred, eps=1e-8,
-                     data_format='channels_last', include_non_brain=False):
+                     data_format='channels_last', include_brain_only=False):
     """Returns dice coefficient between predicted and true outputs.
 
         Args:
@@ -16,6 +16,8 @@ def dice_coefficient(y_true, y_pred, eps=1e-8,
                 denominator.
             data_format: whether data is in the format `channels_last`
                 or `channels_first`.
+            include_brain_only: whether to return dice coefficient
+                averaged across channels corresponding to tumors.
 
         Returns:
             dice_coeff: average dice coefficient across all channels.
@@ -34,14 +36,14 @@ def dice_coefficient(y_true, y_pred, eps=1e-8,
     axis = (0, 1, 2, 3) if data_format == 'channels_last' else (0, 2, 3, 4)
     intersection = tf.reduce_sum(intersection, axis=axis)
 
-    # Count total number of each label
+    # Count total number of each label.
     true_voxels = tf.reduce_sum(y_true, axis=axis)
-    pred_voxels = tf.reduce_sum(y_pred)
+    pred_voxels = tf.reduce_sum(y_pred, axis=axis)
 
-    # Dice coefficients per channel
+    # Dice coefficients per channel.
     dice_coeff = (2.0 * intersection + eps) / (true_voxels + pred_voxels + eps)
 
-    if include_non_brain:
+    if include_brain_only:
         return (tf.reduce_mean(dice_coeff), tf.reduce_mean(dice_coeff[1:]))
     else:
         return tf.reduce_mean(dice_coeff)
@@ -69,7 +71,7 @@ def segmentation_accuracy(y_true, y_pred, data_format='channels_last'):
 
     # Extract predictions at each voxel.
     y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
-    y_pred = tf.one_hot(y_pred, len(LABELS), dtype=tf.float32)
+    y_pred = tf.one_hot(y_pred, len(LABELS), axis=axis, dtype=tf.float32)
 
     # Correct predictions will have 1, else 0.
     correct = tf.reduce_sum(y_pred * y_true)
