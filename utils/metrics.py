@@ -3,6 +3,9 @@ import tensorflow as tf
 from utils.constants import *
 
 
+def get_eval_scores()
+
+
 def dice_coefficient(y_pred, y_true, eps=1e-8,
                      data_format='channels_last', include_non_brain=False):
     """Returns dice coefficient between predicted and true outputs.
@@ -64,7 +67,7 @@ def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
     total_voxels = tf.cast(tf.reduce_prod(y_true.shape), tf.float32)
 
     # Extract predictions at each voxel.
-    y_pred = tf.argmax(y_pred, axis=axis)
+    y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
     y_pred = tf.expand_dims(y_pred, axis=axis)
     y_pred = tf.cast(y_pred, tf.float32)
 
@@ -75,3 +78,36 @@ def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
     correct = tf.reduce_sum(1.0 - correct)
 
     return correct / total_voxels
+
+
+def sensitivity(y_pred, y_true, data_format='channels_last'):
+    # Extract predictions at each voxel.
+    axis = -1 if data_format == 'channels_last' else 1
+    y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
+,
+    # Turn into one-hot encodings per voxel.
+    y_pred = tf.one_hot(y_pred, len(LABELS), axis=axis, dtype=tf.float32)
+
+    # Calculate sensitivity.
+    true_positives = tf.reduce_sum(y_pred * y_true)
+    num_positives = tf.reduce_sum(y_true)
+
+    return true_positives / num_positives
+
+
+def specificity(y_pred, y_true, data_format='channels_last'):
+    # Extract predictions at each voxel.
+    axis = -1 if data_format == 'channels_last' else 1
+    y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
+
+    # Turn into one-hot encodings per voxel.
+    y_pred = tf.one_hot(y_pred, len(LABELS), axis=axis, dtype=tf.float32)
+
+    # Calculate specificity.
+    y_pred = 1.0 - y_pred
+    y_true = 1.0 - y_true
+
+    true_negatives = tf.reduce_sum(y_pred * y_true)
+    num_negatives = tf.reduce_sum(y_true)
+
+    return true_negatives / num_negatives
