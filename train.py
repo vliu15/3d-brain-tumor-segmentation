@@ -1,3 +1,5 @@
+import os
+import glob
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
@@ -10,7 +12,7 @@ from utils.metrics import dice_coefficient, segmentation_accuracy
 from model.volumetric_cnn import VolumetricCNN
 
 
-def prepare_dataset(path, batch_size):
+def prepare_dataset(path, batch_size, name):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
         """Mapping function to parse a single example."""
@@ -26,6 +28,7 @@ def prepare_dataset(path, batch_size):
         'y': tf.io.FixedLenFeature([H * W * D * 1], tf.float32)
     }
 
+    path = glob.glob(os.path.join(path, name + '*' + '.tfrecords'))
     dataset = tf.data.TFRecordDataset(path)
     dataset = (dataset.map(parse_example)
                       .shuffle(10000, reshuffle_each_iteration=False)
@@ -48,8 +51,8 @@ def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_l
 
 def main(args):
     # Load data.
-    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size)
-    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size)
+    train_data, n_train = prepare_dataset(args.prepro_loc, args.batch_size, 'train')
+    val_data, n_val = prepare_dataset(args.prepro_loc, args.batch_size, 'val')
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
 
