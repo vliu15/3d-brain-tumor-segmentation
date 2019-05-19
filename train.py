@@ -146,10 +146,10 @@ def main(args):
             y_batch = batch['y']
             if args.data_format == 'channels_last':
                 x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE).astype(np.int32)
             elif args.data_format == 'channels_first':
                 x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE)
+                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE).astype(np.int32)
 
             with tf.device(args.device):
                 # Forward and loss.
