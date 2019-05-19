@@ -40,8 +40,8 @@ def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_l
     y_true = tf.one_hot(tf.squeeze(y_true, axis=axis), len(LABELS), axis=axis, dtype=tf.float32)
 
     loss = myrnenko_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
-    voxel_accu = segmentation_accuracy(y_pred, y_true, data_format=data_format)
-    dice_coeff = dice_coefficient(y_pred, y_true, data_format=data_format)
+    voxel_accu = segmentation_accuracy(y_true, y_pred, data_format=data_format)
+    dice_coeff = dice_coefficient(y_true, y_pred, data_format=data_format)
 
     return loss, voxel_accu, dice_coeff
 

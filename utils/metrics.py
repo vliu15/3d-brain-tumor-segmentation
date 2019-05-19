@@ -3,14 +3,15 @@ import tensorflow as tf
 from utils.constants import *
 
 
-def dice_coefficient(y_pred, y_true, eps=1e-8,
+def dice_coefficient(y_true, y_pred, eps=1e-8,
                      data_format='channels_last', include_non_brain=False):
     """Returns dice coefficient between predicted and true outputs.
 
         Args:
+            y_true: true segmentation labels per voxel, represented by
+                one-hot vectors of positions [0, 3].
             y_pred: decoder output holding probabilities of each voxel
                 is a tumor, with one tumor per channel.
-            y_true: true segmentation labels of values [0, 3].
             eps: optional smoothing value added to the numerator and
                 denominator.
             data_format: whether data is in the format `channels_last`
@@ -46,14 +47,14 @@ def dice_coefficient(y_pred, y_true, eps=1e-8,
         return tf.reduce_mean(dice_coeff)
 
 
-def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
+def segmentation_accuracy(y_true, y_pred, data_format='channels_last'):
     """Returns voxel-wise accuracy of the prediction, excluding non-brain voxels.
 
         Args:
+            y_true: true segmentation labels per voxel, represented by
+                one-hot vectors of positions [0, 3].
             y_pred: decoder output holding probabilities of each voxel
                 is a tumor, with one tumor per channel.
-            y_pred: true segmentation label with 0 at non-tumor voxels
-                and the label number of a voxel with a corresponding tumor.
             data_format: whether data is in the format `channels_last`
                 or `channels_first`.
 
@@ -61,23 +62,22 @@ def segmentation_accuracy(y_pred, y_true, data_format='channels_last'):
              Voxel accuracy: average voxel-wise accuracy across all voxels.
     """
     axis = -1 if data_format == 'channels_last' else 1
-    total_voxels = tf.cast(tf.reduce_prod(y_true.shape), tf.float32)
+
+    # Compute shape, divide by number of channels.
+    total_voxels = tf.reduce_prod(y_true.shape) / len(LABELS)
+    total_voxels = tf.cast(total_voxes, tf.float32)
 
     # Extract predictions at each voxel.
     y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
-    y_pred = tf.expand_dims(y_pred, axis=axis)
-    y_pred = tf.cast(y_pred, tf.float32)
+    y_pred = tf.one_hot(y_pred, len(LABELS), dtype=tf.float32)
 
-    # Correct predictions will have 0, else 1.
-    correct = tf.cast(tf.cast(y_pred - y_true, tf.bool), tf.float32)
-
-    # Sum up all correct predictions.
-    correct = tf.reduce_sum(1.0 - correct)
+    # Correct predictions will have 1, else 0.
+    correct = tf.reduce_sum(y_pred * y_true)
 
     return correct / total_voxels
 
 
-def sensitivity(y_pred, y_true, data_format='channels_last'):
+def sensitivity(y_true, y_pred, data_format='channels_last'):
     # Extract predictions at each voxel.
     axis = -1 if data_format == 'channels_last' else 1
     y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
@@ -92,7 +92,7 @@ def sensitivity(y_pred, y_true, data_format='channels_last'):
     return true_positives / num_positives
 
 
-def specificity(y_pred, y_true, data_format='channels_last'):
+def specificity(y_true, y_pred, data_format='channels_last'):
     # Extract predictions at each voxel.
     axis = -1 if data_format == 'channels_last' else 1
     y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
