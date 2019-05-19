@@ -15,8 +15,6 @@ def prepro_parser():
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_last', 'channels_first'],
             help='Format of preprocessed data: `channels_last` or `channels_first`.')
-    parser.add_argument('--examples_per_file', type=int, defafult=250,
-            help='Maximum number of examples to write per file.')
 
     # Preprocessing.
     parser.add_argument('--create_val', action='store_true', default=False,
@@ -48,8 +46,10 @@ def train_parser():
             help='Whether to use GPU in training.')
 
     # Data.
-    parser.add_argument('--prepro_loc', type=str, required=True,
-            help='Location of preprocessed data.')
+    parser.add_argument('--train_loc', type=str, required=True,
+            help='Location of preprocessed training data.')
+    parser.add_argument('--val_loc', type=str, required=True,
+            help='Location of preprocessed validation data.')
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')

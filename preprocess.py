@@ -217,8 +217,7 @@ def main(args):
 
     # Randomly flip for data augmentation.
     print('Randomly augment training data, crop, and save.')
-    file_num = 0
-    num_examples = 0
+    writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'train.tfrecords'))
 
     for X, y in tqdm(zip(X_train, y_train)):
         # Augment.
@@ -229,25 +228,13 @@ def main(args):
 
             # Write augmented crops to TFRecord.
             for _ in range(args.n_crops):
-                if num_examples % args.examples_per_file == 0:
-                    file_num += 1
-                    writer = tf.io.TFRecordWriter(
-                                os.path.join(args.out_folder, 'train.{}.tfrecords'.format(file_num)))
-                num_examples += 1
                 X_crop, y_crop = sample_crop(X_augment, y_augment, data_format=args.data_format)
                 example_to_tfrecords(X_crop, y_crop, writer)
 
         # Write original crop to TFRecord.
         for _ in range(args.n_crops):
-            if num_examples % args.examples_per_file == 0:
-                file_num += 1
-                writer = tf.io.TFRecordWriter(
-                            os.path.join(args.out_folder, 'train.{}.tfrecords'.format(file_num)))
-            num_examples += 1
             X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
             example_to_tfrecords(X_crop, y_crop, writer)
-
-    print('Saved {} training examples in {} files.'.format(num_examples, file_num))
 
 
 if __name__ == '__main__':
