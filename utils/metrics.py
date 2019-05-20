@@ -67,7 +67,7 @@ def segmentation_accuracy(y_true, y_pred, data_format='channels_last'):
 
     # Compute shape, divide by number of channels.
     total_voxels = tf.reduce_prod(y_true.shape) / len(LABELS)
-    total_voxels = tf.cast(total_voxes, tf.float32)
+    total_voxels = tf.cast(total_voxels, tf.float32)
 
     # Extract predictions at each voxel.
     y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
