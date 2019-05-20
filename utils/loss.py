@@ -26,6 +26,24 @@ def cross_entropy_loss(y_true, y_pred, smoothing=0.01, data_format='channels_las
     return tf.keras.backend.categorical_crossentropy(y_true, y_pred, axis=axis)
 
 
+def focal_loss(y_true, y_pred, gamma=2, alpha=0.25, smoothing=0.01):
+    """Returns categorical focal loss between predicted and true distributions."""
+    # Apply label smoothing if necessary.
+    if smoothing:
+        y_true -= smoothing * tf.cast(tf.cast(y_true > 0, tf.bool), tf.float32)
+        smoothing /= (OUT_CH - 1)
+        y_true += smoothing * tf.cast(tf.cast(y_true < 1, tf.bool), tf.float32)
+
+    axis = -1 if data_format == 'channels_last' else 1
+
+    y_pred = y_pred / tf.reduce_sum(output, axis=axis, keepdims=True)
+    y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
+
+    focus = 1 - y_pred
+
+    return -tf.reduce_sum(focus * y_true * tf.log(y_pred))
+
+
 def generalized_dice_loss(y_true, y_pred, data_format='channels_last', eps=1e-8):
     """Returns generalized dice loss between target and prediction.
     
