@@ -154,9 +154,7 @@ def tunable_loss(x, y_true, y_pred, y_vae, z_mean, z_logvar,
     """
     n_voxels = tf.cast(tf.math.reduce_prod(x.shape), tf.float32)
 
-    return GDL_WEIGHT * generalized_dice_loss(
+    return FL_WEIGHT * focal_loss(
                             y_true, y_pred, data_format=data_format) + \
-           SS_WEIGHT * sensitivity_specificity_loss(
-                            y_true, y_pred, lamb=lamb, data_format=data_format) + \
            KL_WEIGHT * kullbach_liebler_loss(z_mean, z_logvar, n_voxels) + \
            L2_WEIGHT * l2_loss(x, y_vae)

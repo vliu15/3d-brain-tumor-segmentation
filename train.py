@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.loss import myrnenko_loss
+from utils.losses import tunable_loss
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
 from utils.metrics import dice_coefficient, segmentation_accuracy
@@ -39,7 +39,7 @@ def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_l
     axis = -1 if data_format == 'channels_last' else 1
     y_true = tf.one_hot(tf.squeeze(y_true, axis=axis), len(LABELS), axis=axis, dtype=tf.float32)
 
-    loss = myrnenko_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
+    loss = tunable_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
     voxel_accu = segmentation_accuracy(y_true, y_pred, data_format=data_format)
     dice_coeff = dice_coefficient(y_true, y_pred, data_format=data_format)
 
