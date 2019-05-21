@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from model.layers import ConvBlock
+from model.resnet_block import ConvBlock
 from utils.constants import *
 
 
