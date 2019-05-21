@@ -10,6 +10,7 @@ class DecoderBlock(tf.keras.layers.Layer):
                  kernel_size=3,
                  data_format='channels_last',
                  groups=8,
+                 reduction=4,
                  kernel_regularizer=None):
         """Initializes one level of upsampling in the convolutional decoder.
 
@@ -23,7 +24,7 @@ class DecoderBlock(tf.keras.layers.Layer):
                     The number of filters to use in the 3D convolutional
                     block. The output layer of this green block will have
                     this many number of channels.
-                kernel_size: kernel_size: (int, int, int), optional
+                kernel_size: int, optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 data_format: str, optional
@@ -33,6 +34,10 @@ class DecoderBlock(tf.keras.layers.Layer):
                 groups: int, optional
                     The size of each group for GroupNormalization. Defaults to
                     8, as used in the paper.
+                reduction: int, optional
+                    Reduction ratio for excitation size in squeeze-excitation layer.
+                kernel_regularizer: tf.keras.regularizer callable, optional
+                    Kernel regularizer for convolutional operations.
         """
         super(DecoderBlock, self).__init__()
 
@@ -52,6 +57,7 @@ class DecoderBlock(tf.keras.layers.Layer):
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
+                                reduction=reduction,
                                 kernel_regularizer=kernel_regularizer)
 
     def call(self, x, enc_res):
@@ -71,6 +77,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                  data_format='channels_last',
                  kernel_size=3,
                  groups=8,
+                 reduction=4,
                  kernel_regularizer=None):
         """Initializes the model decoder.
 
@@ -86,12 +93,16 @@ class ConvDecoder(tf.keras.layers.Layer):
                     The format of the input data. Must be either 'channels_last'
                     or 'channels_first'. Defaults to `channels_last` for CPU
                     development. 'channels_first is used in the paper.
-                kernel_size: kernel_size: (int, int, int), optional
+                kernel_size: int, optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 groups: int, optional
                     The size of each group for GroupNormalization. Defaults to
                     8, as used in the paper.
+                reduction: int, optional
+                    Reduction ratio for excitation size in squeeze-excitation layer.
+                kernel_regularizer: tf.keras.regularizer callable, optional
+                    Kernel regularizer for convolutional operations.
         """
         super(ConvDecoder, self).__init__()
         self.dec_block_2 = DecoderBlock(
@@ -99,18 +110,21 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
+                                reduction=reduction,
                                 kernel_regularizer=kernel_regularizer)
         self.dec_block_1 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK1_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
+                                reduction=reduction,
                                 kernel_regularizer=kernel_regularizer)
         self.dec_block_0 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK0_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
+                                reduction=reduction,
                                 kernel_regularizer=kernel_regularizer)
 
         self.conv_out = tf.keras.layers.Conv3D(

@@ -32,7 +32,7 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                     The number of filters to use in the 3D convolutional
                     block. The output layer of this green block will have
                     this many number of channels.
-                kernel_size: kernel_size: (int, int, int), optional
+                kernel_size: int, optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 data_format: str, optional

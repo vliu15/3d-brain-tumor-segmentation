@@ -10,6 +10,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                  kernel_size=3,
                  groups=8,
                  dropout=0.2,
+                 reduction=4,
                  kernel_regularizer=None):
         """Initializes the model encoder.
 
@@ -24,7 +25,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                     The format of the input data. Must be either 'channels_last'
                     or 'channels_first'. Defaults to `channels_last` for CPU
                     development. 'channels_first is used in the paper.
-                kernel_size: (int, int, int), optional
+                kernel_size: int, optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 groups: int, optional
@@ -33,6 +34,10 @@ class ConvEncoder(tf.keras.layers.Layer):
                 dropout: float, optional
                     The dropout rate after initial convolution. Defaults to 0.2,
                     as used in the paper.
+                reduction: int, optional
+                    Reduction ratio for excitation size in squeeze-excitation layer.
+                kernel_regularizer: tf.keras.regularizer callable, optional
+                    Kernel regularizer for convolutional operations.
         """
         super(ConvEncoder, self).__init__()
         # Input layers.
@@ -50,6 +55,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
+                                    reduction=reduction,
                                     kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK0_NUM)]
         self.conv_downsamp_0 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK0_SIZE,
@@ -64,6 +70,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
+                                    reduction=reduction,
                                     kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK1_NUM)]
         self.conv_downsamp_1 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK1_SIZE,
@@ -78,6 +85,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
+                                    reduction=reduction,
                                     kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK2_NUM)]
         self.conv_downsamp_2 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK2_SIZE,
@@ -92,6 +100,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     kernel_size=kernel_size,
                                     data_format=data_format,
                                     groups=groups,
+                                    reduction=reduction,
                                     kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
     def call(self, x, training=False):
