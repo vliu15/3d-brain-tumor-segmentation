@@ -34,6 +34,19 @@ def prepare_dataset(path, batch_size):
     return dataset, get_dataset_len(dataset)
 
 
+def prepare_example(batch, data_format='channels_last'):
+    x_batch = batch['X']
+    y_batch = batch['y']
+    if args.data_format == 'channels_last':
+        x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
+        y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE).astype(np.int32)
+    elif args.data_format == 'channels_first':
+        x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
+        y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE).astype(np.int32)
+
+    return x_batch, y_batch
+
+
 def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_last'):
     # Convert correct labels to one-hot encodings per voxel.
     axis = -1 if data_format == 'channels_last' else 1
@@ -100,14 +113,7 @@ def main(args):
         # Training epoch.
         for step, batch in tqdm(enumerate(train_data, 1), total=n_train):
             # Read data in from serialized string.
-            x_batch = batch['X']
-            y_batch = batch['y']
-            if args.data_format == 'channels_last':
-                x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE).astype(np.int32)
-            elif args.data_format == 'channels_first':
-                x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE).astype(np.int32)
+            x_batch, y_batch = prepare_example(batch)
 
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
@@ -142,14 +148,7 @@ def main(args):
         # Validation epoch.
         for step, batch in tqdm(enumerate(val_data), total=n_val):
             # Read data in from serialized string.
-            x_batch = batch['X']
-            y_batch = batch['y']
-            if args.data_format == 'channels_last':
-                x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE).astype(np.int32)
-            elif args.data_format == 'channels_first':
-                x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
-                y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE).astype(np.int32)
+            x_batch, y_batch = prepare_example(batch)
 
             with tf.device(args.device):
                 # Forward and loss.
