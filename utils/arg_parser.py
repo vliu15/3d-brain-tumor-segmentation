@@ -80,8 +80,6 @@ def train_parser():
             help='Size of convolutional kernels throughout the model.')
     parser.add_argument('--gn_groups', type=int, default=8,
             help='Size of groups for group normalization.')
-    parser.add_argument('--dropout', type=float, default=0.2,
-            help='Dropout rate for dropout layer after initial convolution.')
     parser.add_argument('--se_reduction', type=int, default=4,
             help='Reduction ratio in excitation layers of SENet blocks.')
     parser.add_argument('--l2_scale', type=float, default=1e-5,

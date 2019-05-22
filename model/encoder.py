@@ -48,7 +48,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 padding='same',
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer)
-        self.inp_dropout = tf.keras.layers.Dropout(dropout)
 
         # First ConvBlock: filters=32, x1.
         self.conv_block_0 = [ConvBlock(filters=ENC_CONV_BLOCK0_SIZE,
@@ -128,8 +127,6 @@ class ConvEncoder(tf.keras.layers.Layer):
         """
         # Input layers.
         x = self.inp_conv(x)
-        if training:
-            x = self.inp_dropout(x)
 
         # First ConvBlock: filters=32, x1.
         for conv in self.conv_block_0:
