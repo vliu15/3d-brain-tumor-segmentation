@@ -9,7 +9,7 @@ import model.volumetric_cnn
 
 __all__ = [model.resnet_block,
            model.group_norm,
-           model.squeeze_excitation
+           model.squeeze_excitation,
            model.encoder,
            model.decoder,
            model.variational_autoencoder,

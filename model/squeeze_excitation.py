@@ -19,7 +19,7 @@ class SqueezeExcitation(tf.keras.layers.Layer):
                     or 'channels_first'. Defaults to `channels_last` for CPU
                     development. 'channels_first is used in the paper.
         """
-        super(SqueezeExcitationLayer, self).__init__()
+        super(SqueezeExcitation, self).__init__()
         self.data_format = data_format
         self.reduction = reduction
 
@@ -28,11 +28,9 @@ class SqueezeExcitation(tf.keras.layers.Layer):
 
         # Initialize reduction and excitation in self.build().
 
-        self.scale = tf.keras.layers.Multiply()
-
-    def build(input_shape):
+    def build(self, input_shape):
         """Builds dense layers at call-time."""
-        channels = input_shape[-1] self.data_format == 'channels_last' else input_shape[1]
+        channels = input_shape[-1] if self.data_format == 'channels_last' else input_shape[1]
         if channels % self.reduction != 0:
             raise ValueError(
                 'Reduction ratio, {}, must be a factor of number of channels, {}.'
@@ -41,13 +39,12 @@ class SqueezeExcitation(tf.keras.layers.Layer):
         self.dense_relu = tf.keras.layers.Dense(channels / self.reduction, activation='relu')
         self.dense_sigmoid = tf.keras.layers.Dense(channels, activation='relu')
 
-    def call(x):
+    def call(self, x):
         """Returns the forward pass of one SqueezeExcitationLayer.
         
-            { GlobalAveragePool -> Dense+ReLu -> Dense+Sigmoid -> Scale }
+            { GlobalAveragePool -> Dense+ReLu -> Dense+Sigmoid }
         """
-        se = self.global_pool(x)
-        se = self.dense_relu(x)
-        se = self.dense_sigmoid(x)
-        x = self.scale(se, x)
+        x = self.global_pool(x)
+        x = self.dense_relu(x)
+        x = self.dense_sigmoid(x)
         return x

@@ -36,12 +36,12 @@ def focal_loss(y_true, y_pred, gamma=2, alpha=0.25, smoothing=0.01, data_format=
 
     axis = -1 if data_format == 'channels_last' else 1
 
-    y_pred = y_pred / tf.reduce_sum(output, axis=axis, keepdims=True)
+    y_pred = y_pred / tf.reduce_sum(y_pred, axis=axis, keepdims=True)
     y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
 
     focus = (1 - y_pred) ** gamma
 
-    return -alpha * tf.reduce_sum(focus * y_true * tf.log(y_pred))
+    return -alpha * tf.reduce_sum(focus * y_true * tf.math.log(y_pred))
 
 
 def generalized_dice_loss(y_true, y_pred, data_format='channels_last', eps=1e-8):

@@ -3,11 +3,11 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.losses import tunable_loss
+from utils.losses import focal_loss
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
 from utils.metrics import dice_coefficient, segmentation_accuracy
-from model.volumetric_cnn import VolumetricCNN
+from model.volumetric_cnn import EncDecCNN
 
 
 def prepare_dataset(path, batch_size):
@@ -47,12 +47,12 @@ def prepare_example(batch, data_format='channels_last'):
     return x_batch, y_batch
 
 
-def evaluate(x, y_true, y_pred, y_vae, z_mean, z_logvar, data_format='channels_last'):
+def evaluate(y_true, y_pred, data_format='channels_last'):
     # Convert correct labels to one-hot encodings per voxel.
     axis = -1 if data_format == 'channels_last' else 1
     y_true = tf.one_hot(tf.squeeze(y_true, axis=axis), len(LABELS), axis=axis, dtype=tf.float32)
 
-    loss = tunable_loss(x, y_true, y_pred, y_vae, z_mean,z_logvar, data_format=data_format)
+    loss = focal_loss(y_true, y_pred, data_format=data_format)
     voxel_accu = segmentation_accuracy(y_true, y_pred, data_format=data_format)
     dice_coeff = dice_coefficient(y_true, y_pred, data_format=data_format)
 
@@ -67,12 +67,12 @@ def main(args):
     print('{} validation examples.'.format(n_val))
 
     # Initialize model and optimizer
-    model = VolumetricCNN(
-                        data_format=args.data_format,
-                        kernel_size=args.conv_kernel_size,
-                        groups=args.gn_groups,
-                        dropout=args.dropout,
-                        kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
+    model = EncDecCNN(
+                    data_format=args.data_format,
+                    kernel_size=args.conv_kernel_size,
+                    groups=args.gn_groups,
+                    dropout=args.dropout,
+                    kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss, accuracies, and dice coefficients.
@@ -118,10 +118,9 @@ def main(args):
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
-                    y_pred, y_vae, z_mean, z_logvar = model(x_batch, training=True)
+                    y_pred = model(x_batch, training=True)
                     loss, voxel_accu, dice_coeff = evaluate(
-                                                        x_batch, y_batch, y_pred,
-                                                        y_vae, z_mean, z_logvar,
+                                                        y_batch, y_pred,
                                                         data_format=args.data_format)
                     loss += sum(model.losses)
 
@@ -152,10 +151,9 @@ def main(args):
 
             with tf.device(args.device):
                 # Forward and loss.
-                y_pred, y_vae, z_mean, z_logvar = model(x_batch, training=False)
+                y_pred = model(x_batch, training=False)
                 loss, voxel_accu, dice_coeff = evaluate(
-                                                    x_batch, y_batch, y_pred,
-                                                    y_vae, z_mean, z_logvar,
+                                                    y_batch, y_pred,
                                                     data_format=args.data_format)
                 loss += sum(model.losses)
 
