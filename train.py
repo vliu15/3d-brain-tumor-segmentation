@@ -69,31 +69,32 @@ def main(args):
                                     beta_2=0.999,
                                     epsilon=1e-7,
                                     amsgrad=False),
-                      loss=focal_loss(gamma=2,
+                      loss=focal_loss(
+                                    gamma=2,
                                     alpha=0.25,
                                     data_format=args.data_format),
                       metrics=[tf.keras.metrics.CategoricalAccuracy(),
                                tf.keras.metrics.Precision(),
                                tf.keras.metrics.Recall()])
 
-            model.fit(train_data,
-                      epochs=args.n_epochs,
-                      shuffle=True,
-                      callbacks=[tf.keras.callbacks.LearningRateScheduler(
-                                        scheduler(args.n_epochs, args.lr)),
-                                 tf.keras.callbacks.ModelCheckpoint(
-                                        args.save_file,
-                                        monitor='val_loss',
-                                        save_best_only=True,
-                                        save_weights_only=False),
-                                 tf.keras.callbacks.EarlyStopping(
-                                        monitor='val_loss',
-                                        min_delta=1e-2,
-                                        patience=args.patience),
-                                 tf.keras.callbacks.CSVLogger(
-                                        args.log_file)],
-                      validation_data=val_data,
-                      validation_freq=1)
+        model.fit(train_data,
+                    epochs=args.n_epochs,
+                    shuffle=True,
+                    callbacks=[tf.keras.callbacks.LearningRateScheduler(
+                                    scheduler(args.n_epochs, args.lr)),
+                                tf.keras.callbacks.ModelCheckpoint(
+                                    args.save_file,
+                                    monitor='val_loss',
+                                    save_best_only=True,
+                                    save_weights_only=False),
+                                tf.keras.callbacks.EarlyStopping(
+                                    monitor='val_loss',
+                                    min_delta=1e-2,
+                                    patience=args.patience),
+                                tf.keras.callbacks.CSVLogger(
+                                    args.log_file)],
+                    validation_data=val_data,
+                    validation_freq=1)
 
 
 if __name__ == '__main__':
