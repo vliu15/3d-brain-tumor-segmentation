@@ -4,17 +4,30 @@ from tqdm import tqdm
 
 from utils.arg_parser import train_parser
 from utils.losses import focal_loss
-from utils.optimizer import ScheduledAdam
+from utils.optimizer import scheduler
 from utils.constants import *
 from utils.metrics import dice_coefficient, segmentation_accuracy
 from model.volumetric_cnn import EncDecCNN
 
 
-def prepare_dataset(path, batch_size):
+def prepare_dataset(path, batch_size, data_format='channels_last'):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
         """Mapping function to parse a single example."""
-        return tf.io.parse_single_example(example_proto, example_desc)
+        parsed = tf.io.parse_single_example(example_proto, example_desc)
+        if data_format == 'channels_last':
+            X = tf.reshape(parsed['X'], CHANNELS_LAST_X_SHAPE)
+            y = tf.reshape(parsed['y'], CHANNELS_LAST_Y_SHAPE)
+            y = tf.cast(y, tf.int32)
+            y = tf.squeeze(y, axis=-1)
+            y = tf.one_hot(y, depth=OUT_CH, axis=-1)
+        elif data_format == 'channels_first':
+            X = tf.reshape(parsed['X'], CHANNELS_FIRST_X_SHAPE)
+            y = tf.reshape(parsed['y'], CHANNELS_FIRST_Y_SHAPE)
+            y = tf.cast(y, tf.int32)
+            y = tf.squeeze(y, axis=1)
+            y = tf.one_hot(tf.cast(y, tf.int32), depth=OUT_CH, axis=1)
+        return (X, y)
 
     def get_dataset_len(tf_dataset):
         """Returns length of dataset until tf.data.experimental.cardinality is fixed."""
@@ -28,177 +41,59 @@ def prepare_dataset(path, batch_size):
 
     dataset = tf.data.TFRecordDataset(path)
     dataset = (dataset.map(parse_example)
-                      .shuffle(10000, reshuffle_each_iteration=False)
+                      .shuffle(10000, reshuffle_each_iteration=True)
                       .batch(batch_size))
 
-    return dataset, get_dataset_len(dataset)
-
-
-def prepare_example(batch, data_format='channels_last'):
-    x_batch = batch['X']
-    y_batch = batch['y']
-    if args.data_format == 'channels_last':
-        x_batch = np.reshape(x_batch, CHANNELS_LAST_X_SHAPE)
-        y_batch = np.reshape(y_batch, CHANNELS_LAST_Y_SHAPE).astype(np.int32)
-    elif args.data_format == 'channels_first':
-        x_batch = np.reshape(x_batch, CHANNELS_FIRST_X_SHAPE)
-        y_batch = np.reshape(y_batch, CHANNELS_FIRST_Y_SHAPE).astype(np.int32)
-
-    return x_batch, y_batch
-
-
-def evaluate(y_true, y_pred, data_format='channels_last'):
-    # Convert correct labels to one-hot encodings per voxel.
-    axis = -1 if data_format == 'channels_last' else 1
-    y_true = tf.one_hot(tf.squeeze(y_true, axis=axis), len(LABELS), axis=axis, dtype=tf.float32)
-
-    loss = focal_loss(y_true, y_pred, data_format=data_format)
-    voxel_accu = segmentation_accuracy(y_true, y_pred, data_format=data_format)
-    dice_coeff = dice_coefficient(y_true, y_pred, data_format=data_format)
-
-    return loss, voxel_accu, dice_coeff
+    dataset.__len__ = get_dataset_len(dataset)
+    return dataset
 
 
 def main(args):
     # Load data.
-    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size)
-    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size)
-    print('{} training examples.'.format(n_train))
-    print('{} validation examples.'.format(n_val))
+    train_data = prepare_dataset(args.train_loc, args.batch_size)
+    val_data = prepare_dataset(args.val_loc, args.batch_size)
+    print('{} training examples.'.format(train_data.__len__))
+    print('{} validation examples.'.format(val_data.__len__))
 
-    # Initialize model and optimizer
-    model = EncDecCNN(
-                    data_format=args.data_format,
-                    kernel_size=args.conv_kernel_size,
-                    groups=args.gn_groups,
-                    dropout=args.dropout,
-                    kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
-    optimizer = ScheduledAdam(learning_rate=args.lr)
+    with tf.device(args.device):
+        # Initialize model and optimizer.
+        model = EncDecCNN(
+                        data_format=args.data_format,
+                        kernel_size=args.conv_kernel_size,
+                        groups=args.gn_groups,
+                        kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
 
-    # Initialize loss, accuracies, and dice coefficients.
-    train_loss = tf.keras.metrics.Mean(name='train_loss')
-    train_voxel_accu = tf.keras.metrics.Mean(name='train_voxel_accu')
-    train_dice_coeff = tf.keras.metrics.Mean(name='train_dice_coeff')
-    val_loss = tf.keras.metrics.Mean(name='val_loss')
-    val_voxel_accu = tf.keras.metrics.Mean(name='val_voxel_accu')
-    val_dice_coeff = tf.keras.metrics.Mean(name='val_dice_coeff')
+        model.compile(optimizer=tf.keras.optimizers.Adam(
+                                    learning_rate=args.lr,
+                                    beta_1=0.9,
+                                    beta_2=0.999,
+                                    epsilon=1e-7,
+                                    amsgrad=False),
+                      loss=focal_loss(gamma=2,
+                                    alpha=0.25,
+                                    data_format=args.data_format),
+                      metrics=[tf.keras.metrics.CategoricalAccuracy(),
+                               tf.keras.metrics.Precision(),
+                               tf.keras.metrics.Recall()])
 
-    # Load model weights if specified.
-    if args.load_file:
-        model.load_weights(args.load_file)
-    
-    # Set up logging.
-    if args.log_file:
-        with open(args.log_file, 'w') as f:
-            header = ','.join(['epoch',
-                               'lr',
-                               'train_loss',
-                               'train_voxel_accu',
-                               'train_dice_coeff',
-                               'val_loss',
-                               'val_voxel_accu',
-                               'val_dice_coeff'])
-            f.write(header + '\n')
-
-    best_val_loss = float('inf')
-    patience = 0
-
-    # Train.
-    for epoch in range(args.n_epochs):
-        print('Epoch {}.'.format(epoch))
-
-        # Schedule learning rate.
-        optimizer.update_lr(epoch_num=epoch)
-
-        # Training epoch.
-        for step, batch in tqdm(enumerate(train_data, 1), total=n_train):
-            # Read data in from serialized string.
-            x_batch, y_batch = prepare_example(batch)
-
-            with tf.device(args.device):
-                with tf.GradientTape() as tape:
-                    # Forward and loss.
-                    y_pred = model(x_batch, training=True)
-                    loss, voxel_accu, dice_coeff = evaluate(
-                                                        y_batch, y_pred,
-                                                        data_format=args.data_format)
-                    loss += sum(model.losses)
-
-                # Gradients and backward.
-                grads = tape.gradient(loss, model.trainable_variables)
-                optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
-                train_loss.update_state(loss)
-                train_voxel_accu.update_state(voxel_accu)
-                train_dice_coeff.update_state(dice_coeff)
-
-            # Output loss to console.
-            if step % args.log_steps == 0:
-                print('Step {}. Loss: {l: .4f}, Voxel Accu: {v: 3.3f}, Dice Coeff: {d: 0.4f}.'
-                       .format(step, l=train_loss.result(),
-                                     v=train_voxel_accu.result()*100,
-                                     d=train_dice_coeff.result()))
-
-        print('Training. Loss: {l: .4f}, Voxel Accu: {v: 3.3f}, Dice Coeff: {d: 0.4f}.'
-               .format(l=train_loss.result(),
-                       v=train_voxel_accu.result()*100,
-                       d=train_dice_coeff.result()))
-
-        # Validation epoch.
-        for step, batch in tqdm(enumerate(val_data), total=n_val):
-            # Read data in from serialized string.
-            x_batch, y_batch = prepare_example(batch)
-
-            with tf.device(args.device):
-                # Forward and loss.
-                y_pred = model(x_batch, training=False)
-                loss, voxel_accu, dice_coeff = evaluate(
-                                                    y_batch, y_pred,
-                                                    data_format=args.data_format)
-                loss += sum(model.losses)
-
-                val_loss.update_state(loss)
-                val_voxel_accu.update_state(voxel_accu)
-                val_dice_coeff.update_state(dice_coeff)
-
-        print('Validation. Loss: {l: .4f}, Voxel Accu: {v: 3.3f}, Dice Coeff: {d: 0.4f}.'
-               .format(l=val_loss.result(),
-                       v=val_voxel_accu.result()*100,
-                       d=val_dice_coeff.result()))
-
-        # Write logs.
-        if args.log_file:
-            with open(args.log_file, 'a') as f:
-                entry = ','.join([str(epoch),
-                                  str(optimizer.learning_rate.numpy()),
-                                  str(train_loss.result().numpy()),
-                                  str(train_voxel_accu.result().numpy()),
-                                  str(train_dice_coeff.result().numpy()),
-                                  str(val_loss.result().numpy()),
-                                  str(val_voxel_accu.result().numpy()),
-                                  str(val_dice_coeff.result().numpy())])
-                f.write(entry + '\n')
-
-        # Checkpoint and patience.
-        if val_loss.result() < best_val_loss:
-            best_val_loss = val_loss.result()
-            model.save_weights(args.save_file)
-            patience = 0
-            print('Saved model weights.')
-        elif patience == args.patience:
-            print('Validation loss has not improved in {} epochs. Stopped training.'
-                    .format(args.patience))
-            break
-        else:
-            patience += 1
-
-        # Reset statistics.
-        train_loss.reset_states()
-        train_voxel_accu.reset_states()
-        train_dice_coeff.reset_states()
-        val_loss.reset_states()
-        val_voxel_accu.reset_states()
-        val_dice_coeff.reset_states()
+            model.fit(train_data,
+                      epochs=args.n_epochs,
+                      shuffle=True,
+                      callbacks=[tf.keras.callbacks.LearningRateScheduler(
+                                        scheduler(args.n_epochs, args.lr)),
+                                 tf.keras.callbacks.ModelCheckpoint(
+                                        args.save_file,
+                                        monitor='val_loss',
+                                        save_best_only=True,
+                                        save_weights_only=False),
+                                 tf.keras.callbacks.EarlyStopping(
+                                        monitor='val_loss',
+                                        min_delta=1e-2,
+                                        patience=args.patience),
+                                 tf.keras.callbacks.CSVLogger(
+                                        args.log_file)],
+                      validation_data=val_data,
+                      validation_freq=1)
 
 
 if __name__ == '__main__':
