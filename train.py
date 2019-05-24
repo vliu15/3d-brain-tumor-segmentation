@@ -1,16 +1,14 @@
 import tensorflow as tf
 import numpy as np
-from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.losses import focal_loss
-from utils.optimizer import scheduler
+from utils.losses import FocalLoss
+from utils.optimizer import Scheduler
 from utils.constants import *
-from utils.metrics import dice_coefficient, segmentation_accuracy
 from model.volumetric_cnn import EncDecCNN
 
 
-def prepare_dataset(path, batch_size, data_format='channels_last'):
+def prepare_dataset(path, batch_size, buffer_size, data_format='channels_last'):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
         """Mapping function to parse a single example."""
@@ -40,24 +38,32 @@ def prepare_dataset(path, batch_size, data_format='channels_last'):
     }
 
     dataset = tf.data.TFRecordDataset(path)
+    dataset_len = get_dataset_len(dataset)
+
     dataset = (dataset.map(parse_example)
-                      .shuffle(10000, reshuffle_each_iteration=True)
+                      .repeat()
+                      .shuffle(buffer_size)
                       .batch(batch_size))
 
-    dataset.__len__ = get_dataset_len(dataset)
-    return dataset
+    return dataset, dataset_len
 
 
-def main(args):
+def train(args):
     # Load data.
-    train_data = prepare_dataset(args.train_loc, args.batch_size)
-    val_data = prepare_dataset(args.val_loc, args.batch_size)
-    print('{} training examples.'.format(train_data.__len__))
-    print('{} validation examples.'.format(val_data.__len__))
+    train_data, n_train = prepare_dataset(
+                            args.train_loc, args.batch_size, 500, data_format=args.data_format)
+    val_data, n_val = prepare_dataset(
+                            args.val_loc, args.batch_size, 50, data_format=args.data_format)
+    print('{} training examples.'.format(n_train))
+    print('{} validation examples.'.format(n_val))
+    train_steps_per_epoch = np.ceil(float(n_train) / args.batch_size).astype(np.int32)
+    val_steps_per_epoch = np.ceil(float(n_val) / args.batch_size).astype(np.int32)
 
     with tf.device(args.device):
-        # Initialize model and optimizer.
-        model = EncDecCNN(
+        if args.load_file:
+            model = tf.keras.models.load_model(args.load_file)
+        else:
+            model = EncDecCNN(
                         data_format=args.data_format,
                         kernel_size=args.conv_kernel_size,
                         groups=args.gn_groups,
@@ -69,7 +75,7 @@ def main(args):
                                     beta_2=0.999,
                                     epsilon=1e-7,
                                     amsgrad=False),
-                      loss=focal_loss(
+                      loss=FocalLoss(
                                     gamma=2,
                                     alpha=0.25,
                                     data_format=args.data_format),
@@ -77,26 +83,30 @@ def main(args):
                                tf.keras.metrics.Precision(),
                                tf.keras.metrics.Recall()])
 
-        model.fit(train_data,
-                    epochs=args.n_epochs,
-                    shuffle=True,
-                    callbacks=[tf.keras.callbacks.LearningRateScheduler(
-                                    scheduler(args.n_epochs, args.lr)),
-                                tf.keras.callbacks.ModelCheckpoint(
-                                    args.save_file,
-                                    monitor='val_loss',
-                                    save_best_only=True,
-                                    save_weights_only=False),
-                                tf.keras.callbacks.EarlyStopping(
-                                    monitor='val_loss',
-                                    min_delta=1e-2,
-                                    patience=args.patience),
-                                tf.keras.callbacks.CSVLogger(
-                                    args.log_file)],
-                    validation_data=val_data,
-                    validation_freq=1)
+        history = model.fit(train_data,
+                            epochs=args.n_epochs,
+                            shuffle=True,
+                            callbacks=[tf.keras.callbacks.LearningRateScheduler(
+                                            Scheduler(args.n_epochs, args.lr)),
+                                       tf.keras.callbacks.ModelCheckpoint(
+                                            args.save_file,
+                                            monitor='val_loss',
+                                            save_best_only=True,
+                                            save_weights_only=False),
+                                       tf.keras.callbacks.EarlyStopping(
+                                            monitor='val_loss',
+                                            min_delta=1e-2,
+                                            patience=args.patience),
+                                       tf.keras.callbacks.CSVLogger(
+                                            args.log_file)],
+                            steps_per_epoch=train_steps_per_epoch,
+                            validation_steps=val_steps_per_epoch,
+                            validation_data=val_data,
+                            validation_freq=1)
+
+        return history
 
 
 if __name__ == '__main__':
     args = train_parser()
-    main(args)
+    history = train(args)

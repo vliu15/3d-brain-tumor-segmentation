@@ -57,8 +57,6 @@ def train_parser():
     # Training.
     parser.add_argument('--log_file', type=str, default='train.log',
             help='File for output logs.')
-    parser.add_argument('--log_steps', type=int, default=100,
-            help='Number of steps to output progress.')
     parser.add_argument('--save_file', type=str, default='chkpt.hdf5',
             help='File path to save best checkpoint.')
     parser.add_argument('--load_file', type=str, default='',

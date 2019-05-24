@@ -26,40 +26,40 @@ CHANNELS_LAST_Y_SHAPE      =   (H, W, D, 1)
 
 
 # Encoder.
-ENC_CONV_LAYER_SIZE         =       16                      # Number of filters of initial conv layer.
+ENC_CONV_LAYER_SIZE         =       16
 
-ENC_CONV_BLOCK0_SIZE        =       16                      # Number of filters of first conv block.
-ENC_CONV_BLOCK0_NUM         =       2                       # Number of first conv blocks.
+ENC_CONV_BLOCK0_SIZE        =       16
+ENC_CONV_BLOCK0_NUM         =       2
 
-ENC_CONV_BLOCK1_SIZE        =       32                      # Number of filters of second conv block.
-ENC_CONV_BLOCK1_NUM         =       2                       # Number of second conv blocks.
+ENC_CONV_BLOCK1_SIZE        =       32
+ENC_CONV_BLOCK1_NUM         =       2
 
-ENC_CONV_BLOCK2_SIZE        =       64                      # Number of filters of third conv block.
-ENC_CONV_BLOCK2_NUM         =       2                       # Number of third conv blocks.
+ENC_CONV_BLOCK2_SIZE        =       64
+ENC_CONV_BLOCK2_NUM         =       2
 
-ENC_CONV_BLOCK3_SIZE        =       128                     # Number of filters of fourth conv block.
-ENC_CONV_BLOCK3_NUM         =       4                       # Number of fourth conv blocks.
+ENC_CONV_BLOCK3_SIZE        =       128
+ENC_CONV_BLOCK3_NUM         =       4
 
 
 # Decoder.
-DEC_CONV_BLOCK2_SIZE        =       64                      # Number of filters in first conv block.
-DEC_CONV_BLOCK1_SIZE        =       32                      # Number of filters in second conv block.
-DEC_CONV_BLOCK0_SIZE        =       16                      # Number of filters in third conv block.
+DEC_CONV_BLOCK2_SIZE        =       64
+DEC_CONV_BLOCK1_SIZE        =       32
+DEC_CONV_BLOCK0_SIZE        =       16
 
-DEC_CONV_LAYER_SIZE         =       16                      # Number of filters in final conv layer.
+DEC_CONV_LAYER_SIZE         =       16
 
 
 # Variational Autoencoder.
-VAE_VD_CONV_SIZE            =       8                       # Number of filters in VD conv layer.
-VAE_VD_BLOCK_SIZE           =       128                     # Dimensionality of flattened size.
+VAE_VD_CONV_SIZE            =       8
+VAE_VD_BLOCK_SIZE           =       128
 
-VAE_LATENT_SIZE             =       64                      # Dimensionality of sampling space.
+VAE_LATENT_SIZE             =       64
 
-VAE_VU_BLOCK_SIZE           =       128                     # Number of filters in VU conv block.
+VAE_VU_BLOCK_SIZE           =       128
 
-VAE_CONV_BLOCK2_SIZE        =       64                      # Number of filters in second conv block.
-VAE_CONV_BLOCK1_SIZE        =       32                      # Number of filters in first conv block.
-VAE_CONV_BLOCK0_SIZE        =       16                      # Number of filters in zeroth conv block.
+VAE_CONV_BLOCK2_SIZE        =       64
+VAE_CONV_BLOCK1_SIZE        =       32
+VAE_CONV_BLOCK0_SIZE        =       16
 
 # Loss.
 GDL_WEIGHT  =       1.0
