@@ -1,29 +1,27 @@
 import tensorflow as tf
 
 from utils.constants import *
+from utils.utils import pred_to_one_hot
 
 
 class DiceCoefficient(tf.keras.metrics.Mean):
     def __init__(self,
                  name='dice_coefficient',
-                 eps=1e-8,
-                 data_format='channels_last'):
+                 data_format='channels_last',
+                 tumor_only=True,
+                 eps=1e-8):
         super(DiceCoefficient, self).__init__(name=name)
         self.data_format = data_format
+        self.tumor_only = tumor_only
         self.eps = eps
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        # Extract predictions at each voxel.
-        axis = -1 if self.data_format == 'channels_last' else 1
-        y_pred = tf.argmax(y_pred, axis=axis, output_type=tf.int32)
-
-        # Turn into one-hot encodings per voxel.
-        y_pred = tf.one_hot(y_pred, len(LABELS), axis=axis, dtype=tf.float32)
+        y_pred = pred_to_one_hot(y_pred, self.data_format)
 
         # Correct predictions will have 1, else 0.
         intersection = y_pred * y_true
 
-        # Sum up per channel.
+        # Sum up matches per channel.
         axis = (0, 1, 2, 3) if self.data_format == 'channels_last' else (0, 2, 3, 4)
         intersection = tf.reduce_sum(intersection, axis=axis)
 
@@ -33,77 +31,105 @@ class DiceCoefficient(tf.keras.metrics.Mean):
 
         # Dice coefficients per channel.
         dice_coeff = (2.0 * intersection + self.eps) / (true_voxels + pred_voxels + self.eps)
-        dice_coeff = tf.reduce_mean(dice_coeff)
+        if self.tumor_only:
+            dice_coeff = tf.reduce_mean(dice_coeff[1:])
+        else:
+            dice_coeff = tf.reduce_mean(dice_coeff)
 
         return super(DiceCoefficient, self).update_state(
                             dice_coeff, sample_weight=sample_weight)
 
 
-class TumorVoxelAccuracy(tf.keras.metrics.CategoricalAccuracy):
+class Accuracy(tf.keras.metrics.Mean):
     def __init__(self,
                  name='tumor_voxel_categorical_accuracy',
                  dtype=tf.float32,
-                 data_format='channels_last'):
-        super(TumorVoxelAccuracy, self).__init__(
-                                            name=name,
-                                            dtype=dtype)
+                 data_format='channels_last',
+                 tumor_only=True):
+        super(Accuracy, self).__init__(name=name, dtype=dtype)
         self.data_format = data_format
+        self.tumor_only = tumor_only
 
-    def update_state(self,  y_true, y_pred, sample_weight=None):
-        if self.data_format == 'channels_last':
-            y_true = y_true[:, :, :, :, 1:]
-            y_pred = y_pred[:, :, :, :, 1:]
-        elif self.data_format == 'channels_first':
-            y_true = y_true[:, 1:, :, :, :]
-            y_pred = y_pred[:, 1:, :, :, :]
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_pred = pred_to_one_hot(y_pred, self.data_format)
 
-        return super(TumorVoxelAccuracy, self).update_state(
-                        y_true, y_pred, sample_weight=sample_weight)
+        # If self.tumor_only, only use channels of tumor labels.
+        if self.tumor_only:
+            if self.data_format == 'channels_last':
+                y_true = y_true[:, :, :, :, 1:]
+                y_pred = y_pred[:, :, :, :, 1:]
+            elif self.data_format == 'channels_first':
+                y_true = y_true[:, 1:, :, :, :]
+                y_pred = y_pred[:, 1:, :, :, :]
+
+        # Indicate correct voxel matches with 1, incorrect with 0.
+        correct = 1.0 - tf.cast(tf.cast(y_true - y_pred, tf.bool), tf.float32)
+        correct = tf.reduce_sum(correct)
+
+        total = tf.cast(tf.reduce_prod([tf.shape(y_true)[i] for i in range(5)]), tf.float32)
+
+        return super(Accuracy, self).update_state(
+                        correct / total, sample_weight=sample_weight)
 
 
-class TumorVoxelPrecision(tf.keras.metrics.Precision):
+class Precision(tf.keras.metrics.Mean):
     def __init__(self,
-                 thresholds=0.5,
                  name='tumor_voxel_precision',
                  dtype=tf.float32,
-                 data_format='channels_last'):
-        super(TumorVoxelPrecision, self).__init__(
-                                            thresholds=thresholds,
-                                            name=name,
-                                            dtype=dtype)
+                 data_format='channels_last',
+                 tumor_only=True,
+                 eps=1e-8):
+        super(Precision, self).__init__(name=name, dtype=dtype)
         self.data_format = data_format
+        self.tumor_only = tumor_only
+        self.eps = eps
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        if self.data_format == 'channels_last':
-            y_true = y_true[:, :, :, :, 1:]
-            y_pred = y_pred[:, :, :, :, 1:]
-        elif self.data_format == 'channels_first':
-            y_true = y_true[:, 1:, :, :, :]
-            y_pred = y_pred[:, 1:, :, :, :]
+        y_pred = pred_to_one_hot(y_pred, self.data_format)
 
-        return super(TumorVoxelPrecision, self).update_state(
-                        y_true, y_pred, sample_weight=sample_weight)
+        # If self.tumor_only, only use channels of tumor labels.
+        if self.tumor_only:
+            if self.data_format == 'channels_last':
+                y_true = y_true[:, :, :, :, 1:]
+                y_pred = y_pred[:, :, :, :, 1:]
+            elif self.data_format == 'channels_first':
+                y_true = y_true[:, 1:, :, :, :]
+                y_pred = y_pred[:, 1:, :, :, :]
 
 
-class TumorVoxelRecall(tf.keras.metrics.Recall):
+        true_pos = tf.reduce_sum(y_true * y_pred)
+        pred_pos = tf.reduce_sum(y_pred) + self.eps
+
+        return super(Precision, self).update_state(
+                        true_pos / pred_pos, sample_weight=sample_weight)
+
+
+class Recall(tf.keras.metrics.Mean):
     def __init__(self,
-                 thresholds=0.5,
                  name='tumor_voxel_recall',
                  dtype=tf.float32,
-                 data_format='channels_last'):
-        super(TumorVoxelRecall, self).__init__(
-                                            thresholds=thresholds,
-                                            name=name,
-                                            dtype=dtype)
+                 data_format='channels_last',
+                 tumor_only=True,
+                 eps=1e-8):
+        super(Recall, self).__init__(name=name, dtype=dtype)
         self.data_format = data_format
+        self.tumor_only = tumor_only
+        self.eps = eps
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        if self.data_format == 'channels_last':
-            y_true = y_true[:, :, :, :, 1:]
-            y_pred = y_pred[:, :, :, :, 1:]
-        elif self.data_format == 'channels_first':
-            y_true = y_true[:, 1:, :, :, :]
-            y_pred = y_pred[:, 1:, :, :, :]
+        y_pred = pred_to_one_hot(y_pred, self.data_format)
 
-        return super(TumorVoxelRecall, self).update_state(
-                        y_true, y_pred, sample_weight=sample_weight)
+        # If self.tumor_only, only use channels of tumor labels.
+        if self.tumor_only:
+            if self.data_format == 'channels_last':
+                y_true = y_true[:, :, :, :, 1:]
+                y_pred = y_pred[:, :, :, :, 1:]
+            elif self.data_format == 'channels_first':
+                y_true = y_true[:, 1:, :, :, :]
+                y_pred = y_pred[:, 1:, :, :, :]
+
+        true_pos = tf.reduce_sum(y_true * y_pred)
+        all_pos = tf.reduce_sum(y_true) + self.eps
+
+        return super(Recall, self).update_state(
+                        true_pos / all_pos, sample_weight=sample_weight)

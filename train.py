@@ -3,57 +3,19 @@ import numpy as np
 
 from utils.arg_parser import train_parser
 from utils.losses import FocalLoss
+from utils.metrics import Accuracy, Precision, Recall, DiceCoefficient
 from utils.optimizer import Scheduler
 from utils.constants import *
+from utils.utils import prepare_dataset
 from model.volumetric_cnn import EncDecCNN
-
-
-def prepare_dataset(path, batch_size, buffer_size, data_format='channels_last'):
-    """Returns a BatchDataset object containing loaded data."""
-    def parse_example(example_proto):
-        """Mapping function to parse a single example."""
-        parsed = tf.io.parse_single_example(example_proto, example_desc)
-        if data_format == 'channels_last':
-            X = tf.reshape(parsed['X'], CHANNELS_LAST_X_SHAPE)
-            y = tf.reshape(parsed['y'], CHANNELS_LAST_Y_SHAPE)
-            y = tf.cast(y, tf.int32)
-            y = tf.squeeze(y, axis=-1)
-            y = tf.one_hot(y, depth=OUT_CH, axis=-1)
-        elif data_format == 'channels_first':
-            X = tf.reshape(parsed['X'], CHANNELS_FIRST_X_SHAPE)
-            y = tf.reshape(parsed['y'], CHANNELS_FIRST_Y_SHAPE)
-            y = tf.cast(y, tf.int32)
-            y = tf.squeeze(y, axis=1)
-            y = tf.one_hot(tf.cast(y, tf.int32), depth=OUT_CH, axis=1)
-        return (X, y)
-
-    def get_dataset_len(tf_dataset):
-        """Returns length of dataset until tf.data.experimental.cardinality is fixed."""
-        # return tf.data.experimental.cardinality(tf_dataset)
-        return sum(1 for _ in tf_dataset)
-
-    example_desc = {
-        'X': tf.io.FixedLenFeature([H * W * D * IN_CH], tf.float32),
-        'y': tf.io.FixedLenFeature([H * W * D * 1], tf.float32)
-    }
-
-    dataset = tf.data.TFRecordDataset(path)
-    dataset_len = get_dataset_len(dataset)
-
-    dataset = (dataset.map(parse_example)
-                      .repeat()
-                      .shuffle(buffer_size)
-                      .batch(batch_size))
-
-    return dataset, dataset_len
 
 
 def train(args):
     # Load data.
     train_data, n_train = prepare_dataset(
-                            args.train_loc, args.batch_size, 500, data_format=args.data_format)
+                            args.train_loc, args.batch_size, buffer_size=500, data_format=args.data_format)
     val_data, n_val = prepare_dataset(
-                            args.val_loc, args.batch_size, 50, data_format=args.data_format)
+                            args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format)
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
     train_steps_per_epoch = np.ceil(float(n_train) / args.batch_size).astype(np.int32)
@@ -79,13 +41,13 @@ def train(args):
                                     gamma=2,
                                     alpha=0.25,
                                     data_format=args.data_format),
-                      metrics=[tf.keras.metrics.CategoricalAccuracy(),
-                               tf.keras.metrics.Precision(),
-                               tf.keras.metrics.Recall()])
+                      metrics=[Accuracy(data_format=args.data_format),
+                               Precision(data_format=args.data_format),
+                               Recall(data_format=args.data_format),
+                               DiceCoefficient(data_format=args.data_format)])
 
         history = model.fit(train_data,
                             epochs=args.n_epochs,
-                            shuffle=True,
                             callbacks=[tf.keras.callbacks.LearningRateScheduler(
                                             Scheduler(args.n_epochs, args.lr)),
                                        tf.keras.callbacks.ModelCheckpoint(
@@ -99,9 +61,10 @@ def train(args):
                                             patience=args.patience),
                                        tf.keras.callbacks.CSVLogger(
                                             args.log_file)],
+                            validation_data=val_data,
+                            shuffle=True,
                             steps_per_epoch=train_steps_per_epoch,
                             validation_steps=val_steps_per_epoch,
-                            validation_data=val_data,
                             validation_freq=1)
 
         return history
