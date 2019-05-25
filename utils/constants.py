@@ -62,8 +62,4 @@ VAE_CONV_BLOCK1_SIZE        =       64
 VAE_CONV_BLOCK0_SIZE        =       32
 
 # Loss.
-GDL_WEIGHT  =       1.0
-SS_WEIGHT   =       1.0
-L2_WEIGHT   =       0.1
-KL_WEIGHT   =       0.1
 FL_WEIGHT   =       1.0

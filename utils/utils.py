@@ -51,10 +51,3 @@ def pred_to_one_hot(pred, data_format):
     pred = tf.one_hot(pred, OUT_CH, axis=axis, dtype=tf.float32)
 
     return pred
-
-
-def true_to_one_hot(true, data_format):
-    """Converts true class labels to one-hot encodings."""
-    axis = -1 if data_format == 'channels_last' else 1
-
-    return true
