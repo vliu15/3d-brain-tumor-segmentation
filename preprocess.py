@@ -11,7 +11,6 @@ from utils.constants import *
 
 
 def get_npy_image(subject_folder, name):
-    """Returns np.array from .nii.gz files."""
     try:
         file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii.gz'))[0]
     except:
@@ -38,7 +37,7 @@ def create_dataset(brats_folder, data_format='channels_last'):
     X = []
     y = []
     # Loop through each folder with `.nii.gz` files.
-    for subject_folder in tqdm(glob.glob(os.path.join(brats_folder, '*', '*')), leave=False):
+    for subject_folder in tqdm(glob.glob(os.path.join(brats_folder, '*', '*')), desc='Load data    '):
 
         # Create corresponding output folder.
         if os.path.isdir(subject_folder):
@@ -48,10 +47,8 @@ def create_dataset(brats_folder, data_format='channels_last'):
             X_example = np.stack(
                 [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=axis)
 
-            # Expand channels (1 channel).
-            y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=axis)
-
             # Replace label 4 with 3 for softmax labels at output time.
+            y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=axis)
             np.place(y_example, y_example >= 4, [3])
 
         X.append(X_example)
@@ -61,14 +58,6 @@ def create_dataset(brats_folder, data_format='channels_last'):
 
 
 def create_splits(X, y):
-    """Creates 10:1 train:val split with the data.
-    
-        Args:
-            X: list of inputs (np.ndarray's)
-            y: list of labels (np.ndarray's)
-
-        Returns:
-    """
     data = list(zip(X, y))
     random.shuffle(data)
     X, y = list(zip(*data))
@@ -82,50 +71,50 @@ def create_splits(X, y):
     return X[split:], y[split:], X[:split], y[:split]
 
 
-def compute_train_norm(X_train, data_format='channels_last'):
+def image_norm(X_train, data_format='channels_last'):
     """Returns mean and standard deviation per channel for training inputs."""
     transpose_order = (4, 0, 1, 2, 3) if data_format == 'channels_last' else (1, 0, 2, 3, 4)
     X_train = X_train.transpose(*transpose_order).reshape(IN_CH, -1)
 
-    # Compute mean and std for each channel
+    # Compute mean and std for each channel.
     voxel_mean = np.zeros(IN_CH)
     voxel_std = np.zeros(IN_CH)
     for i, channel in tqdm(enumerate(X_train), leave=False):
         voxel_mean[i] = np.mean(channel[channel != 0])
         voxel_std[i] = np.std(channel[channel != 0])
 
+    voxel_mean = voxel_mean.reshape(1, 1, 1, voxel_mean.shape[0]).repeat(*X_train[0].shape)
+    voxel_std = voxel_std.reshape(1, 1, 1, voxel_std.shape[0]).repeat(*X_train[0].shape)
+
     return voxel_mean, voxel_std
 
 
-def normalize(voxel_mean, voxel_std, X, shard_size, data_format='channels_last'):
+def pixel_norm(X_train, data_format='channels_last'):
+    if data_format == 'channels_last':
+        get_mean = lambda X, h, w, d, c: X[:, h, w, d, c].mean()
+        get_std = lambda X, h, w, d, c: X[:, h, w, d, c].std()
+    elif data_format == 'channels_first':
+        get_mean = lambda X, h, w, d, c: X[:, c, h, w, d].mean()
+        get_std = lambda X, h, w, d, c: X[:, c, h, w, d].std()
+
+    # Compute mean and std for each position.
+    voxel_mean = np.zeros_like(X_train[0])
+    voxel_std = np.zeros_like(X_train[0])
+    for h in range(H):
+        for w in range(W):
+            for d in range(D):
+                for c in range(IN_CH):
+                    voxel_mean[h, w, d, c] = get_mean(X_train, h, w, d, c)
+                    voxel_std[h, w, d, c] = get_std(X_train, h, w, d, c)
+
+    return voxel_mean, voxel_std
+
+
+def normalize(voxel_mean, voxel_std, X):
     """Normalizes an array of features X given voxel-wise mean and std."""
-    # Reshape mean and std into broadcastable with X, then loop per channel to avoid OOM.
-    shape = (1, 1, 1, 1, IN_CH) if data_format == 'channels_last' else (1, IN_CH, 1, 1, 1)
-    voxel_mean = voxel_mean.reshape(*shape)
-    voxel_std = voxel_std.reshape(*shape)
+    for i in tqdm(range(X.shape[0]), desc='Normalize    '):
+        X[i] = (X[i] - voxel_mean) / (voxel_std + 1e-8)
 
-    num_shards = X.shape[0] // shard_size + 1
-    for shard in tqdm(range(num_shards)):
-        X_shard = X[shard*shard_size:(shard+1)*shard_size, ...]
-        X_shard = (X_shard - voxel_mean) / voxel_std
-        X[shard*shard_size:(shard+1)*shard_size, ...] = X_shard
-
-    return X
-
-
-def intensify(shifts, scales, X, shard_size, data_format='channels_last'):
-    """Applies intensity shifting and scaling on X given shift and scale values."""
-    # Reshape shifts and scales into broadcastable with X, then loop per channel to avoid OOM.
-    shape = (1, 1, 1, 1, IN_CH) if data_format == 'channels_last' else (1, IN_CH, 1, 1, 1)
-    shifts = shifts.reshape(*shape)
-    scales = scales.reshape(*shape)
-
-    num_shards = X.shape[0] // shard_size + 1
-    for shard in tqdm(range(num_shards)):
-        X_shard = X[shard*shard_size:(shard+1)*shard_size, ...]
-        X_shard = (X_shard + shifts) * scales
-        X[shard*shard_size:(shard+1)*shard_size, ...] = X_shard
-    
     return X
 
 
@@ -176,19 +165,21 @@ def main(args):
         print('X_train shape: {}.'.format(X_train.shape))
         print('y_train shape: {}.'.format(y_train.shape))
 
-    # Compute mean and std for normalization.
-    print('Calculate voxel-wise mean and std per channel of training set.')
-    voxel_mean, voxel_std = compute_train_norm(X_train, data_format=args.data_format)
-    np.save(os.path.join(args.out_folder, 'voxel_mean_std.npy'),
-            {'mean': voxel_mean, 'std': voxel_std})
-    print('Voxel-wise mean per channel: {}.'.format(voxel_mean))
-    print('Voxel-wise std per channel: {}.'.format(voxel_std))
-
     # Normalize training and validation data.
-    print('Apply per channel normalization.')
-    X_train = normalize(voxel_mean, voxel_std, X_train, args.shard_size, data_format=args.data_format)
+    if args.norm == 'image':
+        print('Apply image-wise normalization per channel.')
+        voxel_mean, voxel_std = image_norm(X_train, data_format=args.data_format)
+        np.save(os.path.join(args.out_folder, 'image_mean_std.npy'),
+                {'mean': voxel_mean, 'std': voxel_std})
+    elif args.norm == 'pixel':
+        print('Apply pixel-wise normalization per channel.')
+        voxel_mean, voxel_std = pixel_norm(X_train, data_format=args.data_format)
+        np.save(os.path.join(args.out_folder, 'pixel_mean_std.npy'),
+                {'mean': voxel_mean, 'std': voxel_std})
+
+    X_train = normalize(voxel_mean, voxel_std, X_train)
     if args.create_val:
-        X_val = normalize(voxel_mean, voxel_std, X_val, args.shard_size, data_format=args.data_format)
+        X_val = normalize(voxel_mean, voxel_std, X_val)
 
         writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'val.tfrecords'))
         for X, y in tqdm(zip(X_val, y_val)):
@@ -197,23 +188,6 @@ def main(args):
                 example_to_tfrecords(X_crop, y_crop, writer)
         del X_val
         del y_val
-
-    if args.intensify:
-        # Compute shifts and scales for intensification.
-        print('Calculate intensity shifts and scales per channel.')
-        shifts = np.random.normal(low=0.0-args.intensity_shift,
-                                high=0.0+args.intensity_shift,
-                                size=(IN_CH,))
-        shifts = shifts * voxel_std
-        scales = np.random.normal(low=1.0-args.intensity_scale,
-                                high=1.0+args.intensity_scale,
-                                size=(IN_CH,))
-        print('Intensity shifts per channel: {}.'.format(shifts))
-        print('Intensity scales per channel: {}.'.format(scales))
-
-        # Apply intensity shifts and scales.
-        print('Apply per channel intensity shifts and scales.')
-        X_train = intensify(shifts, scales, X_train, args.shard_size, data_format=args.data_format)
 
     # Randomly flip for data augmentation.
     print('Randomly augment training data, crop, and save.')
@@ -239,5 +213,4 @@ def main(args):
 
 if __name__ == '__main__':
     args = prepro_parser()
-
     main(args)
