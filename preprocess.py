@@ -83,8 +83,12 @@ def image_norm(X_train, data_format='channels_last'):
         voxel_mean[i] = np.mean(channel[channel != 0])
         voxel_std[i] = np.std(channel[channel != 0])
 
-    voxel_mean = voxel_mean.reshape(1, 1, 1, voxel_mean.shape[0]).repeat(*X_train[0].shape)
-    voxel_std = voxel_std.reshape(1, 1, 1, voxel_std.shape[0]).repeat(*X_train[0].shape)
+    if data_format == 'channels_last':
+        voxel_mean = voxel_mean.reshape(1, 1, 1, voxel_mean.shape[0])
+        voxel_std = voxel_std.reshape(1, 1, 1, voxel_std.shape[0])
+    else:
+        voxel_mean = voxel_mean.reshape(voxel_mean.shape[0], 1, 1, 1)
+        voxel_std = voxel_std.reshape(voxel_std.shape[0], 1, 1, 1)
 
     return voxel_mean, voxel_std
 

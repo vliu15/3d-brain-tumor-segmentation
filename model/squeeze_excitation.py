@@ -39,12 +39,18 @@ class SqueezeExcitation(tf.keras.layers.Layer):
         self.dense_relu = tf.keras.layers.Dense(channels / self.reduction, activation='relu')
         self.dense_sigmoid = tf.keras.layers.Dense(channels, activation='relu')
 
-    def call(self, x):
+    def call(self, inputs):
         """Returns the forward pass of one SqueezeExcitationLayer.
         
             { GlobalAveragePool -> Dense+ReLu -> Dense+Sigmoid }
         """
-        x = self.global_pool(x)
-        x = self.dense_relu(x)
-        x = self.dense_sigmoid(x)
-        return x
+        inputs = self.global_pool(inputs)
+        inputs = self.dense_relu(inputs)
+        inputs = self.dense_sigmoid(inputs)
+        return inputs
+
+    def get_config(self):
+        config = super(SqueezeExcitation, self).get_config()
+        config.update({'data_format': self.data_format,
+                       'reduction': self.reduction})
+        return config

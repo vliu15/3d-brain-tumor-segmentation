@@ -18,7 +18,8 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                  kernel_size=3,
                  data_format='channels_last',
                  groups=8,
-                 kernel_regularizer=None):
+                 kernel_regularizer=None,
+                 use_se=False):
         """Initializes a variational autoencoder block.
 
             See https://arxiv.org/pdf/1810.11654.pdf for more details.
@@ -46,6 +47,14 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                     kernels.
         """
         super(VariationalAutoencoderBlock, self).__init__()
+        # Set up config for self.get_config() to serialize later.
+        self.config = super(VariationalAutoencoderBlock, self).get_config()
+        self.config.update({'filters': filters,
+                            'kernel_size': kernel_size,
+                            'data_format': data_format,
+                            'groups': groups,
+                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'use_se': use_se})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
                                 filters=filters,
@@ -62,17 +71,21 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
 
-    def call(self, x):
+    def call(self, inputs):
         """Returns the forward pass of one VariationalAutoencoderBlock.
 
             { Conv3D_ptwise -> Upsample3D -> ConvBlock }
         """
-        x = self.conv3d_ptwise(x)
-        x = self.upsample(x)
-        x = self.conv_block(x)
-        return x
+        inputs = self.conv3d_ptwise(inputs)
+        inputs = self.upsample(inputs)
+        inputs = self.conv_block(inputs)
+        return inputs
+
+    def get_config(self):
+        return self.config
 
 
 class VariationalAutoencoder(tf.keras.layers.Layer):
@@ -80,7 +93,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  kernel_size=3,
-                 kernel_regularizer=None):
+                 kernel_regularizer=None,
+                 use_se=False):
         """Initializes the Variational Autoencoder branch.
         
             See https://arxiv.org/pdf/1810.11654.pdf for more details.
@@ -102,7 +116,14 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                 kernel_regularizer: regularizer callable for convolutional
                     kernels.
         """
-        super(VariationalAutoencoder, self).__init__(name='variational_autoencoder')
+        super(VariationalAutoencoder, self).__init__()
+        # Set up config for self.get_config() to serialize later.
+        self.config = super(VariationalAutoencoder, self).get_config()
+        self.config.update({'data_format': data_format,
+                            'groups': groups,
+                            'kernel_size': kernel_size,
+                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'use_se': use_se})
 
         # VD Block
         self.groupnorm_VD = GroupNormalization(
@@ -145,21 +166,24 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
 
         self.conv_block_1 = VariationalAutoencoderBlock(
                                 filters=VAE_CONV_BLOCK1_SIZE,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
 
         self.conv_block_0 = VariationalAutoencoderBlock(
                                 filters=VAE_CONV_BLOCK0_SIZE,
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_size=kernel_size,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
 
         self.conv_out = tf.keras.layers.Conv3D(
                                 filters=IN_CH,
@@ -169,7 +193,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer)
 
-    def call(self, x):
+    def call(self, inputs):
         """Returns the forward pass of the VariationalAutoencoder.
 
             {
@@ -181,34 +205,37 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
             }
         """
         # VD Block
-        x = self.groupnorm_VD(x)
-        x = self.relu_VD(x)
-        x = self.conv3d_VD(x)
-        x = self.flatten_VD(x)
-        x = self.proj_VD(x)
+        inputs = self.groupnorm_VD(inputs)
+        inputs = self.relu_VD(inputs)
+        inputs = self.conv3d_VD(inputs)
+        inputs = self.flatten_VD(inputs)
+        inputs = self.proj_VD(inputs)
 
         # VDraw Block
-        z_mean = x[:, :VAE_LATENT_SIZE]
-        z_logvar = x[:, VAE_LATENT_SIZE:]
-        x = self.sample([z_mean, z_logvar])
+        z_mean = inputs[:, :VAE_LATENT_SIZE]
+        z_logvar = inputs[:, VAE_LATENT_SIZE:]
+        inputs = self.sample([z_mean, z_logvar])
 
         # VU Block
-        x = self.proj_VU(x)
-        x = self.relu_VU(x)
-        x = self.reshape_VU(x)
-        x = self.conv1d_VU(x)
-        x = self.conv3d_upsample_VU(x)
+        inputs = self.proj_VU(inputs)
+        inputs = self.relu_VU(inputs)
+        inputs = self.reshape_VU(inputs)
+        inputs = self.conv1d_VU(inputs)
+        inputs = self.conv3d_upsample_VU(inputs)
 
         # VUp2 and VBlock2
-        x = self.conv_block_2(x)
+        inputs = self.conv_block_2(inputs)
 
         # VUp1 and VBlock1
-        x = self.conv_block_1(x)
+        inputs = self.conv_block_1(inputs)
 
         # VUp0 and VBlock0
-        x = self.conv_block_0(x)
+        inputs = self.conv_block_0(inputs)
 
         # Vend
-        x = self.conv_out(x)
+        inputs = self.conv_out(inputs)
 
-        return x, z_mean, z_logvar
+        return inputs, z_mean, z_logvar
+
+    def get_config(self):
+        return self.config

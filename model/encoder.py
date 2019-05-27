@@ -9,9 +9,9 @@ class ConvEncoder(tf.keras.layers.Layer):
                  data_format='channels_last',
                  kernel_size=3,
                  groups=8,
-                 dropout=0.2,
                  reduction=4,
-                 kernel_regularizer=None):
+                 kernel_regularizer=None,
+                 use_se=False):
         """Initializes the model encoder.
 
             See https://arxiv.org/pdf/1810.11654.pdf for more details.
@@ -40,6 +40,15 @@ class ConvEncoder(tf.keras.layers.Layer):
                     Kernel regularizer for convolutional operations.
         """
         super(ConvEncoder, self).__init__()
+        # Set up config for self.get_config() to serialize later.
+        self.config = super(ConvEncoder, self).get_config()
+        self.config.update({'data_format': data_format,
+                            'kernel_size': kernel_size,
+                            'groups': groups,
+                            'reduction': reduction,
+                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'use_se': use_se})
+
         # Input layers.
         self.inp_conv = tf.keras.layers.Conv3D(
                                 filters=ENC_CONV_LAYER_SIZE,
@@ -55,7 +64,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     data_format=data_format,
                                     groups=groups,
                                     reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK0_NUM)]
+                                    kernel_regularizer=kernel_regularizer,
+                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK0_NUM)]
         self.conv_downsamp_0 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK0_SIZE,
                                     kernel_size=kernel_size,
@@ -70,7 +80,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     data_format=data_format,
                                     groups=groups,
                                     reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK1_NUM)]
+                                    kernel_regularizer=kernel_regularizer,
+                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK1_NUM)]
         self.conv_downsamp_1 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK1_SIZE,
                                     kernel_size=kernel_size,
@@ -85,7 +96,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     data_format=data_format,
                                     groups=groups,
                                     reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK2_NUM)]
+                                    kernel_regularizer=kernel_regularizer,
+                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK2_NUM)]
         self.conv_downsamp_2 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK2_SIZE,
                                     kernel_size=kernel_size,
@@ -100,9 +112,10 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     data_format=data_format,
                                     groups=groups,
                                     reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer) for _ in range(ENC_CONV_BLOCK3_NUM)]
+                                    kernel_regularizer=kernel_regularizer,
+                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
-    def call(self, x, training=False):
+    def call(self, inputs):
         """Returns the forward pass of the ConvEncoder.
 
             {
@@ -126,30 +139,32 @@ class ConvEncoder(tf.keras.layers.Layer):
                 -   Output of the forward pass.
         """
         # Input layers.
-        x = self.inp_conv(x)
+        inputs = self.inp_conv(inputs)
 
         # First ConvBlock: filters=32, x1.
         for conv in self.conv_block_0:
-            x = conv(x)
-        conv_out_0 = x
-        x = self.conv_downsamp_0(x)
+            inputs = conv(inputs)
+        conv_out_0 = inputs
+        inputs = self.conv_downsamp_0(inputs)
 
         # Second ConvBlock: filters=64, x2.
         for conv in self.conv_block_1:
-            x = conv(x)
-        conv_out_1 = x
-        x = self.conv_downsamp_1(x)
+            inputs = conv(inputs)
+        conv_out_1 = inputs
+        inputs = self.conv_downsamp_1(inputs)
 
         # Third ConvBlock: filters=128. x2.
         for conv in self.conv_block_2:
-            x = conv(x)
-        conv_out_2 = x
-        x = self.conv_downsamp_2(x)
+            inputs = conv(inputs)
+        conv_out_2 = inputs
+        inputs = self.conv_downsamp_2(inputs)
 
         # Fourth ConvBlock: filters=256, x4.
         for conv in self.conv_block_3:
-            x = conv(x)
-        encoder_out = x
+            inputs = conv(inputs)
 
         # Return values after each ConvBlock for residuals later.
-        return conv_out_0, conv_out_1, conv_out_2, encoder_out
+        return (conv_out_0, conv_out_1, conv_out_2, inputs)
+
+    def get_config(self):
+        return self.config

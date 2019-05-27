@@ -1,16 +1,17 @@
 import tensorflow as tf
 import numpy as np
+from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.losses import FocalLoss
-from utils.metrics import Accuracy, Precision, Recall, DiceCoefficient
-from utils.optimizer import Scheduler
+from utils.losses import DiceLoss
+from utils.metrics import DiceCoefficient
+from utils.optimizer import ScheduledAdam
 from utils.constants import *
 from utils.utils import prepare_dataset
 from model.volumetric_cnn import EncDecCNN
 
 
-def train(args):
+def custom_train(args):
     # Load data.
     train_data, n_train = prepare_dataset(
                             args.train_loc, args.batch_size, buffer_size=500, data_format=args.data_format)
@@ -18,8 +19,175 @@ def train(args):
                             args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format)
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
-    train_steps_per_epoch = np.ceil(float(n_train) / args.batch_size).astype(np.int32)
-    val_steps_per_epoch = np.ceil(float(n_val) / args.batch_size).astype(np.int32)
+
+    # Initialize model and optimizer.
+    model = EncDecCNN(
+                    data_format=args.data_format,
+                    kernel_size=args.conv_kernel_size,
+                    groups=args.gn_groups,
+                    kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
+    _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
+                                    else [1] + list(CHANNELS_LAST_X_SHAPE)))
+    if args.load_file:
+        model.load_weights(args.load_file)
+    n_params = tf.reduce_sum([tf.reduce_prod(var.shape) for var in model.trainable_variables])
+    print('Total number of parameters: {}'.format(n_params))
+
+    optimizer = ScheduledAdam(learning_rate=args.lr)
+
+    # Initialize loss and metrics.
+    loss_fn = DiceLoss(data_format=args.data_format)
+
+    train_loss = tf.keras.metrics.Mean(name='train_loss')
+    train_accu = tf.keras.metrics.BinaryAccuracy(name='train_accu')
+    train_prec = tf.keras.metrics.Precision(name='train_prec')
+    train_reca = tf.keras.metrics.Recall(name='train_reca')
+    train_dice = DiceCoefficient(name='train_dice', data_format=args.data_format)
+
+    val_loss = tf.keras.metrics.Mean(name='val_loss')
+    val_accu = tf.keras.metrics.BinaryAccuracy(name='val_accu')
+    val_prec = tf.keras.metrics.Precision(name='val_prec')
+    val_reca = tf.keras.metrics.Recall(name='val_reca')
+    val_dice = DiceCoefficient(name='val_dice', data_format=args.data_format)
+
+    # Load model weights if specified.
+    if args.load_file:
+        model.load_weights(args.load_file)
+    
+    # Set up logging.
+    if args.log_file:
+        with open(args.log_file, 'w') as f:
+            header = ','.join(['epoch',
+                               'lr',
+                               'train_loss',
+                               'train_accu',
+                               'train_prec',
+                               'train_reca',
+                               'train_dice',
+                               'val_loss',
+                               'val_accu',
+                               'val_prec',
+                               'val_reca',
+                               'val_dice'])
+            f.write(header + '\n')
+
+    best_val_loss = float('inf')
+    patience = 0
+
+    # Train.
+    for epoch in range(args.n_epochs):
+        print('Epoch {}.'.format(epoch))
+
+        # Schedule learning rate.
+        optimizer(epoch_num=epoch)
+
+        # Training epoch.
+        for step, (X, y) in tqdm(enumerate(train_data, 1), total=n_train, desc='Training      '):
+            with tf.device(args.device):
+                with tf.GradientTape() as tape:
+                    # Forward and loss.
+                    y_pred = model(X, training=True)
+                    loss = loss_fn(y, y_pred)
+                    loss += tf.reduce_sum(model.losses)
+
+                # Gradients and backward.
+                grads = tape.gradient(loss, model.trainable_variables)
+                optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+                train_loss.update_state(loss)
+                train_accu.update_state(y, y_pred)
+                train_prec.update_state(y, y_pred)
+                train_reca.update_state(y, y_pred)
+                train_dice.update_state(y, y_pred)
+
+            # Output loss to console.
+            if args.log_steps > 0 and step % args.log_steps == 0:
+                print('Step {}. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
+                       .format(step, l=train_loss.result(),
+                                     v=train_accu.result(),
+                                     p=train_prec.result(),
+                                     r=train_reca.result(),
+                                     d=train_dice.result()))
+
+        print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
+                       .format(l=train_loss.result(),
+                               v=train_accu.result(),
+                               p=train_prec.result(),
+                               r=train_reca.result(),
+                               d=train_dice.result()))
+
+        # Validation epoch.
+        for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
+            with tf.device(args.device):
+                # Forward and loss.
+                y_pred = model(X, training=False)
+                loss = loss_fn(y, y_pred)
+                loss += tf.reduce_sum(model.losses)
+
+                val_loss.update_state(loss)
+                val_accu.update_state(y, y_pred)
+                val_prec.update_state(y, y_pred)
+                val_reca.update_state(y, y_pred)
+                val_dice.update_state(y, y_pred)
+
+        print('Validation. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
+                       .format(l=val_loss.result(),
+                               v=val_accu.result(),
+                               p=val_prec.result(),
+                               r=val_reca.result(),
+                               d=val_dice.result()))
+
+        # Write logs.
+        if args.log_file:
+            with open(args.log_file, 'a') as f:
+                entry = ','.join([str(epoch),
+                                  str(optimizer.learning_rate.numpy()),
+                                  str(train_loss.result().numpy()),
+                                  str(train_accu.result().numpy()),
+                                  str(train_prec.result().numpy()),
+                                  str(train_reca.result().numpy()),
+                                  str(train_dice.result().numpy()),
+                                  str(val_loss.result().numpy()),
+                                  str(val_prec.result().numpy()),
+                                  str(val_reca.result().numpy()),
+                                  str(val_accu.result().numpy()),
+                                  str(val_dice.result().numpy())])
+                f.write(entry + '\n')
+
+        # Checkpoint and patience.
+        if val_loss.result() < best_val_loss:
+            best_val_loss = val_loss.result()
+            model.save_weights(args.save_file)
+            patience = 0
+            print('Saved model weights.')
+        elif patience == args.patience:
+            print('Validation loss has not improved in {} epochs. Stopped training.'
+                    .format(args.patience))
+            break
+        else:
+            patience += 1
+
+        # Reset statistics.
+        train_loss.reset_states()
+        train_accu.reset_states()
+        train_prec.reset_states()
+        train_reca.reset_states()
+        train_dice.reset_states()
+        val_loss.reset_states()
+        val_accu.reset_states()
+        val_prec.reset_states()
+        val_reca.reset_states()
+        val_dice.reset_states()
+
+
+def keras_train(args):
+    # Load data.
+    train_data, n_train = prepare_dataset(
+                            args.train_loc, args.batch_size, buffer_size=500, data_format=args.data_format)
+    val_data, n_val = prepare_dataset(
+                            args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format)
+    print('{} training examples.'.format(n_train))
+    print('{} validation examples.'.format(n_val))
 
     with tf.device(args.device):
         if args.load_file:
@@ -29,7 +197,9 @@ def train(args):
                         data_format=args.data_format,
                         kernel_size=args.conv_kernel_size,
                         groups=args.gn_groups,
-                        kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
+                        reduction=args.se_reduction,
+                        kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
+                        use_se=args.use_se)
 
         model.compile(optimizer=tf.keras.optimizers.Adam(
                                     learning_rate=args.lr,
@@ -37,13 +207,10 @@ def train(args):
                                     beta_2=0.999,
                                     epsilon=1e-7,
                                     amsgrad=False),
-                      loss=FocalLoss(
-                                    gamma=2,
-                                    alpha=0.25,
-                                    data_format=args.data_format),
-                      metrics=[Accuracy(data_format=args.data_format),
-                               Precision(data_format=args.data_format),
-                               Recall(data_format=args.data_format),
+                      loss=DiceLoss(data_format=args.data_format),
+                      metrics=[tf.keras.metrics.Accuracy(),
+                               tf.keras.metrics.Precision(),
+                               tf.keras.metrics.Recall(),
                                DiceCoefficient(data_format=args.data_format)])
 
         history = model.fit(train_data,
@@ -72,4 +239,5 @@ def train(args):
 
 if __name__ == '__main__':
     args = train_parser()
-    history = train(args)
+    custom_train(args)
+    # history = keras_train(args)

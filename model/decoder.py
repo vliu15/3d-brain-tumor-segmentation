@@ -11,7 +11,8 @@ class DecoderBlock(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None):
+                 kernel_regularizer=None,
+                 use_se=False):
         """Initializes one level of upsampling in the convolutional decoder.
 
             Each decoder block consists of a pointwise 3D-convolution followed
@@ -40,6 +41,15 @@ class DecoderBlock(tf.keras.layers.Layer):
                     Kernel regularizer for convolutional operations.
         """
         super(DecoderBlock, self).__init__()
+        # Set up config for self.get_config() to serialize later.
+        self.config = super(DecoderBlock, self).get_config()
+        self.config.update({'filters': filters,
+                            'kernel_size': kernel_size,
+                            'data_format': data_format,
+                            'groups': groups,
+                            'reduction': reduction,
+                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'use_se': use_se})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
                                 filters=filters,
@@ -58,18 +68,23 @@ class DecoderBlock(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 groups=groups,
                                 reduction=reduction,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
 
-    def call(self, x, enc_res):
+    def call(self, inputs):
         """Returns the forward pass of one DecoderBlock.
 
             { Conv3D_ptwise -> Upsample3D -> Residual -> ConvBlock }
         """
-        x = self.conv3d_ptwise(x)
-        x = self.upsample(x)
-        x = self.residual([x, enc_res])
-        x = self.conv_block(x)
-        return x
+        inputs, enc_res = inputs
+        inputs = self.conv3d_ptwise(inputs)
+        inputs = self.upsample(inputs)
+        inputs = self.residual([inputs, enc_res])
+        inputs = self.conv_block(inputs)
+        return inputs
+
+    def get_config(self):
+        return self.config
 
 
 class ConvDecoder(tf.keras.layers.Layer):
@@ -78,7 +93,8 @@ class ConvDecoder(tf.keras.layers.Layer):
                  kernel_size=3,
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None):
+                 kernel_regularizer=None,
+                 use_se=False):
         """Initializes the model decoder.
 
             See https://arxiv.org/pdf/1810.11654.pdf for more details.
@@ -105,27 +121,39 @@ class ConvDecoder(tf.keras.layers.Layer):
                     Kernel regularizer for convolutional operations.
         """
         super(ConvDecoder, self).__init__()
+        # Set up config for self.get_config() to serialize later.
+        self.config = super(ConvDecoder, self).get_config()
+        self.config.update({'data_format': data_format,
+                            'kernel_size': kernel_size,
+                            'groups': groups,
+                            'reduction': reduction,
+                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'use_se': use_se})
+
         self.dec_block_2 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK2_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 reduction=reduction,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
         self.dec_block_1 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK1_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 reduction=reduction,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
         self.dec_block_0 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK0_SIZE,
                                 kernel_size=kernel_size,
                                 data_format=data_format,
                                 groups=groups,
                                 reduction=reduction,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                use_se=use_se)
 
         self.conv_out = tf.keras.layers.Conv3D(
                                 filters=DEC_CONV_LAYER_SIZE,
@@ -136,15 +164,15 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 kernel_regularizer=kernel_regularizer)
 
         self.ptwise_logits = tf.keras.layers.Conv3D(
-                                filters=OUT_CH,
+                                filters=OUT_CH-1,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
-                                activation='softmax')
+                                activation='sigmoid')
 
-    def call(self, enc_outs):
+    def call(self, inputs):
         """Returns the forward pass of the ConvDecoder.
 
             {
@@ -163,13 +191,16 @@ class ConvDecoder(tf.keras.layers.Layer):
                     Output 'image' the same size as the original input image
                     to the encoder, but with 3 channels.
         """
-        enc_out_0, enc_out_1, enc_out_2, x = enc_outs
+        enc_out_0, enc_out_1, enc_out_2, inputs = inputs
 
-        x = self.dec_block_2(x, enc_out_2)
-        x = self.dec_block_1(x, enc_out_1)
-        x = self.dec_block_0(x, enc_out_0)
+        inputs = self.dec_block_2((inputs, enc_out_2))
+        inputs = self.dec_block_1((inputs, enc_out_1))
+        inputs = self.dec_block_0((inputs, enc_out_0))
 
-        x = self.conv_out(x)
-        x = self.ptwise_logits(x)
+        inputs = self.conv_out(inputs)
+        inputs = self.ptwise_logits(inputs)
 
-        return x
+        return inputs
+
+    def get_config(self):
+        return self.config

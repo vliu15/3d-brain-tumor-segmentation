@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 from utils.constants import *
 
@@ -14,12 +15,14 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
             y = tf.cast(y, tf.int32)
             y = tf.squeeze(y, axis=-1)
             y = tf.one_hot(y, OUT_CH, axis=-1, dtype=tf.float32)
+            y = y[:, :, :, 1:]
         elif data_format == 'channels_first':
             X = tf.reshape(parsed['X'], CHANNELS_FIRST_X_SHAPE)
             y = tf.reshape(parsed['y'], CHANNELS_FIRST_Y_SHAPE)
             y = tf.cast(y, tf.int32)
             y = tf.squeeze(y, axis=1)
             y = tf.one_hot(y, OUT_CH, axis=1, dtype=tf.float32)
+            y = y[1:, :, :, :]
 
         return (X, y)
 
@@ -37,7 +40,6 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
     dataset_len = get_dataset_len(dataset)
 
     dataset = (dataset.map(parse_example)
-                      .repeat()
                       .shuffle(buffer_size)
                       .batch(batch_size))
 
