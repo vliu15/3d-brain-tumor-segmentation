@@ -17,12 +17,12 @@ def prepro_parser():
     # Preprocessing.
     parser.add_argument('--create_val', action='store_true', default=False,
             help='Whether to create validation split from training data.')
-    parser.add_argument('--norm', type=str, default='pixel',
+    parser.add_argument('--norm', type=str, default='image',
             choices=['image', 'pixel'],
             help='Type of normalization to apply.')
     parser.add_argument('--mirror_prob', type=float, default=0.5,
             help='Probability that each inputs are flipped across all 3 axes.')
-    parser.add_argument('--n_crops', type=int, default=2,
+    parser.add_argument('--n_crops', type=int, default=1,
             help='Number of random crops to sample per image.')
 
     args = parser.parse_args()
@@ -56,7 +56,7 @@ def train_parser():
             help='File path to save best checkpoint.')
     parser.add_argument('--load_file', type=str, default='',
             help='File path to load complete checkpoint.')
-    parser.add_argument('--log_steps', type=int, default=5,
+    parser.add_argument('--log_steps', type=int, default=-1,
             help='Frequency at which to output training statistics.')
     parser.add_argument('--patience', type=int, default=10,
             help='Number of epochs if validation scores have not improved \
@@ -65,7 +65,7 @@ def train_parser():
     # Optimization.
     parser.add_argument('--n_epochs', type=int, default=300,
             help='Total number of epochs to train for.')
-    parser.add_argument('--lr', type=float, default=1e-6,
+    parser.add_argument('--lr', type=float, default=1e-4,
             help='Initial learning rate of Adam optimizer.')
     parser.add_argument('--batch_size', type=int, default=1,
             help='Batch size to be used in training.')

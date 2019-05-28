@@ -20,12 +20,14 @@ class ScheduledAdam(tf.keras.optimizers.Adam):
                                         amsgrad=amsgrad,
                                         name=name,
                                         **kwargs)
-        self.init_lr = learning_rate
+        self.init_lr = tf.constant(learning_rate, dtype=tf.float32)
         self.n_epochs = float(n_epochs)
     
     def __call__(self, epoch_num):
         """Allows external manual scheduling per epoch."""
-        new_lr = self.init_lr * ((1.0 - epoch_num / self.n_epochs) ** 0.9)
+        new_lr = tf.minimum(
+                    self.init_lr * ((1.0 - epoch_num / self.n_epochs) ** 0.9),
+                    self.init_lr * (10.0 ** (-2.0 + epoch_num)))
         self._set_hyper('learning_rate', new_lr)
 
 

@@ -12,8 +12,8 @@ LABELS      =       [0, 1, 2, 3]
 RAW_H    =  240                     # Height of raw image.
 RAW_W    =  240                     # Width of raw image.
 RAW_D    =  155                     # Depth of raw image.
-H        =  128                     # Target height of preprocessed image.
-W        =  128                     # Target width of preprocessed image.
+H        =  144                     # Target height of preprocessed image.
+W        =  144                     # Target width of preprocessed image.
 D        =  128                     # Target depth of preprocessed image.
 
 IN_CH    =  len(BRATS_MODALITIES)   # Number of input channels.

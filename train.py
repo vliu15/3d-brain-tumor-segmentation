@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.losses import DiceLoss
+from utils.losses import DiceLoss, FocalLoss
 from utils.metrics import DiceCoefficient
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
@@ -14,20 +14,27 @@ from model.volumetric_cnn import EncDecCNN
 def custom_train(args):
     # Load data.
     train_data, n_train = prepare_dataset(
-                            args.train_loc, args.batch_size, buffer_size=500, data_format=args.data_format)
+                            args.train_loc, args.batch_size, buffer_size=100, data_format=args.data_format)
     val_data, n_val = prepare_dataset(
                             args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format)
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
 
-    # Initialize model and optimizer.
+    # Initialize model.
     model = EncDecCNN(
                     data_format=args.data_format,
                     kernel_size=args.conv_kernel_size,
                     groups=args.gn_groups,
                     kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
+
+    # Build model with initial forward pass.
     _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
                                     else [1] + list(CHANNELS_LAST_X_SHAPE)))
+
+    # Get starting epoch.
+    start_epoch = model.epoch.value().numpy()
+    
+    # Load weights if specified.
     if args.load_file:
         model.load_weights(args.load_file)
     n_params = tf.reduce_sum([tf.reduce_prod(var.shape) for var in model.trainable_variables])
@@ -36,6 +43,7 @@ def custom_train(args):
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss and metrics.
+    # loss_fn = FocalLoss(gamma=2, alpha=0.25, smoothing=0.0, data_format=args.data_format)
     loss_fn = DiceLoss(data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -75,8 +83,11 @@ def custom_train(args):
     patience = 0
 
     # Train.
-    for epoch in range(args.n_epochs):
+    for epoch in range(start_epoch, args.n_epochs):
         print('Epoch {}.'.format(epoch))
+
+        # Track epoch in model.
+        model.epoch.assign(epoch)
 
         # Schedule learning rate.
         optimizer(epoch_num=epoch)
@@ -183,7 +194,7 @@ def custom_train(args):
 def keras_train(args):
     # Load data.
     train_data, n_train = prepare_dataset(
-                            args.train_loc, args.batch_size, buffer_size=500, data_format=args.data_format)
+                            args.train_loc, args.batch_size, buffer_size=100, data_format=args.data_format)
     val_data, n_val = prepare_dataset(
                             args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format)
     print('{} training examples.'.format(n_train))

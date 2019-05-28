@@ -157,18 +157,12 @@ class FocalLoss(tf.keras.losses.Loss):
         axis = -1 if self.data_format == 'channels_last' else 1
 
         # Apply label smoothing if necessary.
-        if self.smoothing:
+        if self.smoothing > 0:
             y_true = y_true * (1.0 - self.smoothing) + (1.0 - y_true) * self.smoothing
 
-        # Apply p to y=1 and (1-p) to (y!=1) positions.
-        y_pred = y_true * y_pred + (1.0 - y_true) * (1.0 - y_pred)
-
-        # Apply self.alpha for class rebalancing.
-        alpha = y_true * self.alpha + (1.0 - y_true) * (1.0 - self.alpha)
-
-        focus = (1 - y_pred) ** self.gamma
-        f_loss = -tf.reduce_sum(alpha * focus * tf.math.log(y_pred))
-        return f_loss
+        f_loss = -self.alpha * ((1. - y_pred) ** self.gamma) * y_true * tf.math.log(y_pred)
+        f_loss -= (1. - self.alpha) * (y_pred ** self.gamma) * (1. - y_true) * tf.math.log(y_pred)
+        return tf.reduce_mean(f_loss)
 
 
 class CustomLoss(tf.keras.losses.Loss):

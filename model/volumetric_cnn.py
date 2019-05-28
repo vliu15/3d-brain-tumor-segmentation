@@ -37,6 +37,7 @@ class VolumetricCNN(tf.keras.models.Model):
                     Whether to apply squeeze-excitation layer to residual blocks.
         """
         super(VolumetricCNN, self).__init__()
+        self.epoch = tf.Variable(0, name='epoch', trainable=False)
         self.encoder = ConvEncoder(
                                 data_format=data_format,
                                 kernel_size=kernel_size,
@@ -102,6 +103,7 @@ class EncDecCNN(tf.keras.models.Model):
                     Whether to apply squeeze-excitation layer to residual blocks.
         """
         super(EncDecCNN, self).__init__()
+        self.epoch = tf.Variable(0, name='epoch', trainable=False)
         self.encoder = ConvEncoder(
                                 data_format=data_format,
                                 kernel_size=kernel_size,

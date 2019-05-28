@@ -191,16 +191,16 @@ class ConvDecoder(tf.keras.layers.Layer):
                     Output 'image' the same size as the original input image
                     to the encoder, but with 3 channels.
         """
-        enc_out_0, enc_out_1, enc_out_2, inputs = inputs
+        enc_out_0, enc_out_1, enc_out_2, x = inputs
 
-        inputs = self.dec_block_2((inputs, enc_out_2))
-        inputs = self.dec_block_1((inputs, enc_out_1))
-        inputs = self.dec_block_0((inputs, enc_out_0))
+        x = self.dec_block_2((x, enc_out_2))
+        x = self.dec_block_1((x, enc_out_1))
+        x = self.dec_block_0((x, enc_out_0))
 
-        inputs = self.conv_out(inputs)
-        inputs = self.ptwise_logits(inputs)
+        x = self.conv_out(x)
+        x = self.ptwise_logits(x)
 
-        return inputs
+        return x
 
     def get_config(self):
         return self.config
