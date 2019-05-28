@@ -67,6 +67,8 @@ def train_parser():
             help='Total number of epochs to train for.')
     parser.add_argument('--lr', type=float, default=1e-4,
             help='Initial learning rate of Adam optimizer.')
+    parser.add_argument('--warmup_epochs', type=int, default=10,
+            help='Number of epochs for learning rate warmup.')
     parser.add_argument('--batch_size', type=int, default=1,
             help='Batch size to be used in training.')
 

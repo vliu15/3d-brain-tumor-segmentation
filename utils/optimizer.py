@@ -1,6 +1,9 @@
 import tensorflow as tf
 
 
+BASE_LR = 1e-6
+
+
 class ScheduledAdam(tf.keras.optimizers.Adam):
     """Adam optimizer that allows for scheduling every epoch."""
     def __init__(self,
@@ -11,6 +14,7 @@ class ScheduledAdam(tf.keras.optimizers.Adam):
                  amsgrad=False,
                  name='Adam',
                  n_epochs=300,
+                 warmup_epochs=10,
                  **kwargs):
         super(ScheduledAdam, self).__init__(
                                         learning_rate=learning_rate,
@@ -22,12 +26,14 @@ class ScheduledAdam(tf.keras.optimizers.Adam):
                                         **kwargs)
         self.init_lr = tf.constant(learning_rate, dtype=tf.float32)
         self.n_epochs = float(n_epochs)
+        self.warmup_size = (learning_rate - BASE_LR) / warmup_epochs
+
     
     def __call__(self, epoch_num):
         """Allows external manual scheduling per epoch."""
         new_lr = tf.minimum(
                     self.init_lr * ((1.0 - epoch_num / self.n_epochs) ** 0.9),
-                    self.init_lr * (10.0 ** (-2.0 + epoch_num)))
+                    BASE_LR + epoch_num * self.warmup_size )
         self._set_hyper('learning_rate', new_lr)
 
 
