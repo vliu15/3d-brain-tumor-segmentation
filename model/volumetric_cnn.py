@@ -12,6 +12,7 @@ class VolumetricCNN(tf.keras.models.Model):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=None,
+                 kernel_initializer=tf.initializers.he_normal,
                  use_se=False):
         """Initializes the VolumetricCNN model.
         
@@ -44,6 +45,7 @@ class VolumetricCNN(tf.keras.models.Model):
                                 groups=groups,
                                 reduction=reduction,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
         self.decoder = ConvDecoder(
                                 data_format=data_format,
@@ -51,12 +53,14 @@ class VolumetricCNN(tf.keras.models.Model):
                                 groups=groups,
                                 reduction=reduction,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
         self.vae = VariationalAutoencoder(
                                 data_format=data_format,
                                 kernel_size=kernel_size,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
 
     def call(self, inputs, training=False):
@@ -78,6 +82,7 @@ class EncDecCNN(tf.keras.models.Model):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=None,
+                 kernel_initializer=tf.initializers.he_normal,
                  use_se=False):
         """Initializes the EncDecCNN model.
         
@@ -110,6 +115,7 @@ class EncDecCNN(tf.keras.models.Model):
                                 groups=groups,
                                 reduction=reduction,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer = kernel_initializer,
                                 use_se=use_se)
         self.decoder = ConvDecoder(
                                 data_format=data_format,
@@ -117,6 +123,7 @@ class EncDecCNN(tf.keras.models.Model):
                                 groups=groups,
                                 reduction=reduction,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
 
     def call(self, inputs, training=False):
