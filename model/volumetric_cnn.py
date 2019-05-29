@@ -115,7 +115,7 @@ class EncDecCNN(tf.keras.models.Model):
                                 groups=groups,
                                 reduction=reduction,
                                 kernel_regularizer=kernel_regularizer,
-                                kernel_initializer = kernel_initializer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
         self.decoder = ConvDecoder(
                                 data_format=data_format,
