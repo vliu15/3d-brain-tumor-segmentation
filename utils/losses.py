@@ -36,6 +36,7 @@ class DiceLoss(tf.keras.losses.Loss):
                     format of the data, for determining the axis to compute loss over.
         """
         super(DiceLoss, self).__init__(name=name)
+        assert eps <= 1 and eps > 0, '`eps` needs to be in the range (0, 1].'
         self.data_format = data_format
         self.eps = eps
 
@@ -156,16 +157,18 @@ class FocalLoss(tf.keras.losses.Loss):
         """
         axis = -1 if self.data_format == 'channels_last' else 1
 
-        # Clip values to avoid NaNs.
-        y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
-
         # Apply label smoothing if necessary.
         if self.smoothing > 0:
             y_true = y_true * (1.0 - self.smoothing) + (1.0 - y_true) * self.smoothing
 
-        f_loss = -self.alpha * ((1. - y_pred) ** self.gamma) * y_true * tf.math.log(y_pred)
-        f_loss -= (1. - self.alpha) * (y_pred ** self.gamma) * (1. - y_true) * tf.math.log(y_pred)
-        return tf.reduce_sum(f_loss)
+        # Apply p to y=1 and (1-p) to (y!=1) positions.
+        y_pred = y_true * y_pred + (1.0 - y_true) * (1.0 - y_pred)
+
+        # Apply self.alpha for class rebalancing.
+        alpha = y_true * self.alpha + (1.0 - y_true) * (1.0 - self.alpha)
+
+        focus = (1 - y_pred) ** self.gamma
+        return -tf.reduce_sum(alpha * focus * tf.math.log(y_pred))
 
 
 class CustomLoss(tf.keras.losses.Loss):

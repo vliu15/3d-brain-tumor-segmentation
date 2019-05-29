@@ -77,7 +77,7 @@ def train_parser():
             help='Size of convolutional kernels throughout the model.')
     parser.add_argument('--gn_groups', type=int, default=8,
             help='Size of groups for group normalization.')
-    parser.add_argument('--use_see', action='store_true', default=False,
+    parser.add_argument('--use_se', action='store_true', default=False,
             help='Whether to use SENet blocks instead of ResNet blocks.')
     parser.add_argument('--se_reduction', type=int, default=4,
             help='Reduction ratio in excitation layers of SENet blocks.')

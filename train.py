@@ -25,11 +25,13 @@ def custom_train(args):
                     data_format=args.data_format,
                     kernel_size=args.conv_kernel_size,
                     groups=args.gn_groups,
+                    reduction=args.se_reduction,
+                    use_se=args.use_se,
                     kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
 
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
-                                    else [1] + list(CHANNELS_LAST_X_SHAPE)))
+                                    else [1] + list(CHANNELS_FIRST_X_SHAPE)))
 
     # Get starting epoch.
     start_epoch = model.epoch.value().numpy()
