@@ -3,3 +3,4 @@ tensorflow==2.0.0-alpha0
 numpy==1.15
 tqdm
 nibabel
+scipy

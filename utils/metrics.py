@@ -1,16 +1,17 @@
 import tensorflow as tf
+from scipy.spatial.distance import directed_hausdorff
 
 from utils.constants import *
 from utils.utils import pred_to_one_hot
 
 
-# TODO: implement Hausdorff distance metric
 class HausdorffDistance(tf.keras.metrics.Mean):
-    def __init__(self):
-        super(HausdorffDistance, self).__init__()
+    def __init__(self,
+                 name='hausdorff_distance'):
+        super(HausdorffDistance, self).__init__(name=name)
 
     def __call__(self, y_true, y_pred, sample_weight=None):
-        raise NotImplementedError
+        return tf.reduce_max(directed_hausdorff(y_true, y_pred)[0], directed_hausdorff(y_pred, y_true)[0])
 
 
 class DiceCoefficient(tf.keras.metrics.Mean):
