@@ -11,8 +11,8 @@ class VolumetricCNN(tf.keras.models.Model):
                  kernel_size=3,
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None,
-                 kernel_initializer=tf.initializers.he_normal,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes the VolumetricCNN model.
         
@@ -34,6 +34,8 @@ class VolumetricCNN(tf.keras.models.Model):
                     Reduction ratio for excitation size in squeeze-excitation layer.
                 kernel_regularizer: tf.keras.regularizer callable, optional
                     Kernel regularizer for convolutional operations.
+                kernel_initializer: tf.keras.initializers callable, optional
+                    Kernel initializer for convolutional operations.
                 use_se: bool, optional
                     Whether to apply squeeze-excitation layer to residual blocks.
         """
@@ -81,8 +83,8 @@ class EncDecCNN(tf.keras.models.Model):
                  kernel_size=3,
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None,
-                 kernel_initializer=tf.initializers.he_normal,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes the EncDecCNN model.
         
@@ -104,6 +106,8 @@ class EncDecCNN(tf.keras.models.Model):
                     Reduction ratio for excitation size in squeeze-excitation layer.
                 kernel_regularizer: tf.keras.regularizer callable, optional
                     Kernel regularizer for convolutional operations.
+                kernel_initializer: tf.keras.initializers callable, optional
+                    Kernel initializer for convolutional operations.
                 use_se: bool, optional
                     Whether to apply squeeze-excitation layer to residual blocks.
         """

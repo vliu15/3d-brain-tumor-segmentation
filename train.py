@@ -27,7 +27,8 @@ def custom_train(args):
                     groups=args.gn_groups,
                     reduction=args.se_reduction,
                     use_se=args.use_se,
-                    kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
+                    kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
+                    kernel_initializer=tf.keras.initializers.he_normal)
 
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
@@ -227,6 +228,7 @@ def keras_train(args):
                         groups=args.gn_groups,
                         reduction=args.se_reduction,
                         kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
+                        kernel_initializer=tf.keras.initializers.he_normal,
                         use_se=args.use_se)
 
         model.compile(optimizer=tf.keras.optimizers.Adam(
