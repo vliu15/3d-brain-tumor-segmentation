@@ -9,8 +9,8 @@ class ConvLayer(tf.keras.layers.Layer):
                  kernel_size=3,
                  data_format='channels_last',
                  groups=8,
-                 kernel_initializer=tf.initializers.he_normal,
-                 kernel_regularizer=None):
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal):
         """Initializes one convolutional layer.
 
             Each convolutional layer is comprised of a group normalization,
@@ -33,6 +33,8 @@ class ConvLayer(tf.keras.layers.Layer):
                     8, as used in the paper.
                 kernel_regularizer: tf.keras.regularizer callable, optional
                     Kernel regularizer for convolutional operations.
+                kernel_initializer: tf.keras.initializers callable, optional
+                    Kernel initializer for convolutional operations.
         """
         super(ConvLayer, self).__init__()
         # Set up config for self.get_config() to serialize later.
@@ -41,7 +43,8 @@ class ConvLayer(tf.keras.layers.Layer):
                             'kernel_size': kernel_size,
                             'data_format': data_format,
                             'groups': groups,
-                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer)})
+                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer)})
 
         self.groupnorm = GroupNormalization(
                             groups=groups,
@@ -77,8 +80,8 @@ class ConvBlock(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None,
-                 kernel_initializer=tf.initializers.he_normal,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes one convolutional block.
 
@@ -117,6 +120,7 @@ class ConvBlock(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
                             'use_se': use_se})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(

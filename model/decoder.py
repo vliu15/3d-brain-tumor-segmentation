@@ -11,8 +11,8 @@ class DecoderBlock(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None,
-                 kernel_initializer=tf.initializers.he_normal,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes one level of upsampling in the convolutional decoder.
 
@@ -40,6 +40,8 @@ class DecoderBlock(tf.keras.layers.Layer):
                     Reduction ratio for excitation size in squeeze-excitation layer.
                 kernel_regularizer: tf.keras.regularizer callable, optional
                     Kernel regularizer for convolutional operations.
+                kernel_initializer: tf.keras.initializers callable, optional
+                    Kernel initializer for convolutional operations.
         """
         super(DecoderBlock, self).__init__()
         # Set up config for self.get_config() to serialize later.
@@ -50,6 +52,7 @@ class DecoderBlock(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
                             'use_se': use_se})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
@@ -96,8 +99,8 @@ class ConvDecoder(tf.keras.layers.Layer):
                  kernel_size=3,
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None,
-                 kernel_initializer=tf.initializers.he_normal,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes the model decoder.
 
@@ -123,6 +126,8 @@ class ConvDecoder(tf.keras.layers.Layer):
                     Reduction ratio for excitation size in squeeze-excitation layer.
                 kernel_regularizer: tf.keras.regularizer callable, optional
                     Kernel regularizer for convolutional operations.
+                kernel_initializer: tf.keras.initializers callable, optional
+                    Kernel initializer for convolutional operations.
         """
         super(ConvDecoder, self).__init__()
         # Set up config for self.get_config() to serialize later.
@@ -132,6 +137,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
                             'use_se': use_se})
 
         self.dec_block_2 = DecoderBlock(

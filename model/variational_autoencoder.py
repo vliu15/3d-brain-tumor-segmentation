@@ -18,7 +18,8 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                  kernel_size=3,
                  data_format='channels_last',
                  groups=8,
-                 kernel_regularizer=None,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes a variational autoencoder block.
 
@@ -54,6 +55,7 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                             'data_format': data_format,
                             'groups': groups,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
                             'use_se': use_se})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
@@ -62,7 +64,8 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                                 strides=1,
                                 padding='same',
                                 data_format=data_format,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer)
         self.upsample = tf.keras.layers.UpSampling3D(
                                 size=2,
                                 data_format=data_format)
@@ -72,6 +75,7 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 groups=groups,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
 
     def call(self, inputs):
@@ -93,7 +97,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  kernel_size=3,
-                 kernel_regularizer=None,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes the Variational Autoencoder branch.
         
@@ -110,11 +115,13 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                 groups: int, optional
                     The size of each group for GroupNormalization. Defaults to
                     8, as used in the paper.
-                kernel_size: kernel_size: (int, int, int), optional
+                kernel_size: kernel_size: int, optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
-                kernel_regularizer: regularizer callable for convolutional
-                    kernels.
+                kernel_regularizer: tf.keras.regularizers callable, optional
+                    Kernel regularization for convolutional and dense operations.
+                kernel_initializer: tf.keras.initializers callable, optional
+                    Kernel initializer for convolutional operations.
         """
         super(VariationalAutoencoder, self).__init__()
         # Set up config for self.get_config() to serialize later.
@@ -123,6 +130,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                             'groups': groups,
                             'kernel_size': kernel_size,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
                             'use_se': use_se})
 
         # VD Block
@@ -136,9 +144,12 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 strides=2,
                                 padding='same',
                                 data_format=data_format,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer)
         self.flatten_VD = tf.keras.layers.Flatten(data_format)
-        self.proj_VD = tf.keras.layers.Dense(VAE_VD_BLOCK_SIZE)
+        self.proj_VD = tf.keras.layers.Dense(units=VAE_VD_BLOCK_SIZE,
+                                             kernel_regularizer=kernel_regularizer,
+                                             kernel_initializer=kernel_initializer)
 
         # VDraw Block
         self.sample = tf.keras.layers.Lambda(sample)
@@ -147,7 +158,9 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
         h = int(H/16)
         w = int(W/16)
         d = int(D/16)
-        self.proj_VU = tf.keras.layers.Dense(h * w * d * 1)
+        self.proj_VU = tf.keras.layers.Dense(units=h * w * d * 1,
+                                             kernel_regularizer=kernel_regularizer,
+                                             kernel_initializer=kernel_initializer)
         self.relu_VU = tf.keras.layers.Activation('relu')
         self.reshape_VU = tf.keras.layers.Reshape((h, w, d, 1))
         self.conv1d_VU = tf.keras.layers.Conv3D(
@@ -156,7 +169,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 strides=1,
                                 padding='same',
                                 data_format=data_format,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer)
         self.conv3d_upsample_VU = tf.keras.layers.UpSampling3D(
                                 size=2,
                                 data_format=data_format)
@@ -167,6 +181,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
 
         self.conv_block_1 = VariationalAutoencoderBlock(
@@ -175,6 +190,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
 
         self.conv_block_0 = VariationalAutoencoderBlock(
@@ -183,6 +199,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 groups=groups,
                                 kernel_size=kernel_size,
                                 kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 use_se=use_se)
 
         self.conv_out = tf.keras.layers.Conv3D(
@@ -191,7 +208,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                 strides=1,
                                 padding='same',
                                 data_format=data_format,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer)
 
     def call(self, inputs):
         """Returns the forward pass of the VariationalAutoencoder.

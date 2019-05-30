@@ -10,8 +10,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                  kernel_size=3,
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=None,
-                 kernel_initializer=tf.initializers.he_normal,
+                 kernel_regularizer=tf.keras.regularizers(l=1e-5),
+                 kernel_initializer=tf.keras.initializers.he_normal,
                  use_se=False):
         """Initializes the model encoder.
 
@@ -39,6 +39,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                     Reduction ratio for excitation size in squeeze-excitation layer.
                 kernel_regularizer: tf.keras.regularizer callable, optional
                     Kernel regularizer for convolutional operations.
+                kernel_initializer: tf.keras.initializers callable, optional
+                    Kernel initializer for convolutional operations.
         """
         super(ConvEncoder, self).__init__()
         # Set up config for self.get_config() to serialize later.
@@ -48,6 +50,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
+                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
                             'use_se': use_se})
 
         # Input layers.
