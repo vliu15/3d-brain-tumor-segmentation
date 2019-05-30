@@ -10,7 +10,7 @@ class ConvLayer(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer=tf.keras.initializers.he_normal):
+                 kernel_initializer='he_normal'):
         """Initializes one convolutional layer.
 
             Each convolutional layer is comprised of a group normalization,
@@ -44,7 +44,7 @@ class ConvLayer(tf.keras.layers.Layer):
                             'data_format': data_format,
                             'groups': groups,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
-                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer)})
+                            'kernel_initializer': kernel_initializer})
 
         self.groupnorm = GroupNormalization(
                             groups=groups,
@@ -81,7 +81,7 @@ class ConvBlock(tf.keras.layers.Layer):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer=tf.keras.initializers.he_normal,
+                 kernel_initializer='he_normal',
                  use_se=False):
         """Initializes one convolutional block.
 
@@ -120,7 +120,7 @@ class ConvBlock(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
-                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
+                            'kernel_initializer': kernel_initializer,
                             'use_se': use_se})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
@@ -135,7 +135,9 @@ class ConvBlock(tf.keras.layers.Layer):
         if self.use_se:
             self.se_layer = SqueezeExcitation(
                                     reduction=reduction,
-                                    data_format=data_format)
+                                    data_format=data_format,
+                                    kernel_regularizer=kernel_regularizer,
+                                    kernel_initializer=kernel_initializer)
             self.scale = tf.keras.layers.Multiply()
         self.conv_layer1 = ConvLayer(
                                 filters=filters,

@@ -1,21 +1,29 @@
 import tensorflow as tf
-from scipy.spatial.distance import directed_hausdorff
+try:
+    from scipy.spatial.distance import directed_hausdorff
+    compute = True
+except:
+    compute = False
 
 from utils.constants import *
 from utils.utils import pred_to_one_hot
 
-
+# TODO: Fix dependencies for scipy.
 class HausdorffDistance(tf.keras.metrics.Mean):
     def __init__(self,
                  name='hausdorff_distance'):
         super(HausdorffDistance, self).__init__(name=name)
 
     def __call__(self, y_true, y_pred, sample_weight=None):
+        y_pred = pred_to_one_hot(y_pred)
+
         y_true = tf.reshape(y_true, shape=(1, -1))
         y_pred = tf.reshape(y_pred, shape=(1, -1))
-        
-        return tf.reduce_max(directed_hausdorff(y_true, y_pred)[0],
-                             directed_hausdorff(y_pred, y_true)[0])
+        if compute = True
+            return tf.reduce_max(directed_hausdorff(y_true, y_pred)[0],
+                                 directed_hausdorff(y_pred, y_true)[0])
+        else:
+            raise NotImplemented
 
 
 class DiceCoefficient(tf.keras.metrics.Mean):

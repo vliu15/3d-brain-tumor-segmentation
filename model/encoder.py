@@ -10,8 +10,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                  kernel_size=3,
                  groups=8,
                  reduction=4,
-                 kernel_regularizer=tf.keras.regularizers(l=1e-5),
-                 kernel_initializer=tf.keras.initializers.he_normal,
+                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
+                 kernel_initializer='he_normal',
                  use_se=False):
         """Initializes the model encoder.
 
@@ -50,7 +50,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
-                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
+                            'kernel_initializer': kernel_initializer,
                             'use_se': use_se})
 
         # Input layers.

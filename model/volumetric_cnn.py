@@ -12,7 +12,7 @@ class VolumetricCNN(tf.keras.models.Model):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer=tf.keras.initializers.he_normal,
+                 kernel_initializer='he_normal',
                  use_se=False):
         """Initializes the VolumetricCNN model.
         
@@ -84,7 +84,7 @@ class EncDecCNN(tf.keras.models.Model):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer=tf.keras.initializers.he_normal,
+                 kernel_initializer='he_normal',
                  use_se=False):
         """Initializes the EncDecCNN model.
         

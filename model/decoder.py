@@ -12,7 +12,7 @@ class DecoderBlock(tf.keras.layers.Layer):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer=tf.keras.initializers.he_normal,
+                 kernel_initializer='he_normal',
                  use_se=False):
         """Initializes one level of upsampling in the convolutional decoder.
 
@@ -52,7 +52,7 @@ class DecoderBlock(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
-                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
+                            'kernel_initializer': kernel_initializer,
                             'use_se': use_se})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
@@ -100,7 +100,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer=tf.keras.initializers.he_normal,
+                 kernel_initializer='he_normal',
                  use_se=False):
         """Initializes the model decoder.
 
@@ -137,7 +137,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                             'groups': groups,
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
-                            'kernel_initializer': tf.keras.initializers.serialize(kernel_initializer),
+                            'kernel_initializer': kernel_initializer,
                             'use_se': use_se})
 
         self.dec_block_2 = DecoderBlock(
