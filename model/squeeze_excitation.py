@@ -46,7 +46,7 @@ class SqueezeExcitation(tf.keras.layers.Layer):
                                                 activation='relu')
         self.dense_sigmoid = tf.keras.layers.Dense(channels,
                                                    kernel_regularizer=self.kernel_regularizer,
-                                                   kernel_initializer=self.kernel_initializer,
+                                                   kernel_initializer='glorot_normal',
                                                    activation='sigmoid')
 
     def call(self, inputs):

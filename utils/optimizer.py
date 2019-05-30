@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-BASE_LR = 1e-5 # Learning rate to start warmup from
+BASE_LR = 1e-6 # Learning rate to start warmup from
 
 
 class ScheduledAdam(tf.keras.optimizers.Adam):
@@ -28,7 +28,6 @@ class ScheduledAdam(tf.keras.optimizers.Adam):
         self.n_epochs = float(n_epochs)
         self.warmup_size = (learning_rate - BASE_LR) / warmup_epochs
 
-    
     def __call__(self, epoch_num):
         """Allows external manual scheduling per epoch."""
         new_lr = tf.minimum(

@@ -184,7 +184,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 padding='same',
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
+                                kernel_initializer='glorot_normal',
                                 activation='sigmoid')
 
     def call(self, inputs):
