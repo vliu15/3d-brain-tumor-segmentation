@@ -1,12 +1,11 @@
 """Contains frequently used constants."""
 # Preprocessing.
-# BRATS_MODALITIES = ['t1', 't1ce', 'flair', 't2']
 RTOG_MODALITIES = ['t1c', 'flair']
 BRATS_MODALITIES = ['t1ce', 'flair']
 TRUTH = 'seg'
 
-# LABELS      =       [1, 2, 4]
 LABELS      =       [0, 1, 2, 3]
+
 
 # Data.
 RAW_H    =  240                     # Height of raw image.
@@ -50,17 +49,13 @@ DEC_CONV_LAYER_SIZE         =       16
 
 
 # Variational Autoencoder.
-VAE_VD_CONV_SIZE            =       16
-VAE_VD_BLOCK_SIZE           =       256
+VAE_VD_CONV_SIZE            =       8
+VAE_VD_BLOCK_SIZE           =       128
 
-VAE_LATENT_SIZE             =       128
+VAE_LATENT_SIZE             =       64
 
-VAE_VU_BLOCK_SIZE           =       256
+VAE_VU_BLOCK_SIZE           =       128
 
-VAE_CONV_BLOCK2_SIZE        =       128
-VAE_CONV_BLOCK1_SIZE        =       64
-VAE_CONV_BLOCK0_SIZE        =       32
-
-# Loss.
-FL_WEIGHT   =       1e-3
-DL_WEIGHT   =       1.0
+VAE_CONV_BLOCK2_SIZE        =       64
+VAE_CONV_BLOCK1_SIZE        =       32
+VAE_CONV_BLOCK0_SIZE        =       16

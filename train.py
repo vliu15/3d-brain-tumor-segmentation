@@ -45,7 +45,6 @@ def custom_train(args):
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss and metrics.
-    # loss_fn = FocalLoss(gamma=2, alpha=0.25, smoothing=0.0, data_format=args.data_format)
     loss_fn = DiceLoss(data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')

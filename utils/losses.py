@@ -169,17 +169,3 @@ class FocalLoss(tf.keras.losses.Loss):
 
         focus = (1 - y_pred) ** self.gamma
         return -tf.reduce_sum(alpha * focus * tf.math.log(y_pred))
-
-
-class CustomLoss(tf.keras.losses.Loss):
-    """Custom loss class for weighted combinations of various losses."""
-    def __init__(self,
-                 name='custom_loss',
-                 data_format='channels_last'):
-        super(CustomLoss, self).__init__(name=name)
-        self.dice_loss = DiceLoss(data_format=data_format)
-        self.focal_loss = FocalLoss(data_format=data_format)
-
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        return FL_WEIGHT * self.focal_loss(y_true, y_pred) + \
-                DL_WEIGHT * self.dice_loss(y_true, y_pred)
