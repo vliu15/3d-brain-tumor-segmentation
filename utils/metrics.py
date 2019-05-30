@@ -11,7 +11,8 @@ class HausdorffDistance(tf.keras.metrics.Mean):
         super(HausdorffDistance, self).__init__(name=name)
 
     def __call__(self, y_true, y_pred, sample_weight=None):
-        return tf.reduce_max(directed_hausdorff(y_true, y_pred)[0], directed_hausdorff(y_pred, y_true)[0])
+        return tf.reduce_max(directed_hausdorff(y_true, y_pred)[0],
+                             directed_hausdorff(y_pred, y_true)[0])
 
 
 class DiceCoefficient(tf.keras.metrics.Mean):
