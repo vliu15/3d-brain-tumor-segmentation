@@ -228,6 +228,7 @@ def keras_train(args):
                         groups=args.gn_groups,
                         reduction=args.se_reduction,
                         kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
+                        kernel_initializer=tf.keras.initializers.he_normal,
                         use_se=args.use_se)
 
         model.compile(optimizer=tf.keras.optimizers.Adam(
