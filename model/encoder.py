@@ -11,6 +11,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                  groups=8,
                  reduction=4,
                  kernel_regularizer=None,
+                 kernel_initializer=tf.initializers.he_normal,
                  use_se=False):
         """Initializes the model encoder.
 
@@ -56,7 +57,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 strides=1,
                                 padding='same',
                                 data_format=data_format,
-                                kernel_regularizer=kernel_regularizer)
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer)
 
         # First ConvBlock: filters=32, x1.
         self.conv_block_0 = [ConvBlock(filters=ENC_CONV_BLOCK0_SIZE,
@@ -65,6 +67,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     groups=groups,
                                     reduction=reduction,
                                     kernel_regularizer=kernel_regularizer,
+                                    kernel_initializer=kernel_initializer,
                                     use_se=use_se) for _ in range(ENC_CONV_BLOCK0_NUM)]
         self.conv_downsamp_0 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK0_SIZE,
@@ -72,7 +75,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     strides=2,
                                     padding='same',
                                     data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer)
+                                    kernel_regularizer=kernel_regularizer,
+                                    kernel_initializer=kernel_initializer)
 
         # Second ConvBlock: filters=64, x2.
         self.conv_block_1 = [ConvBlock(filters=ENC_CONV_BLOCK1_SIZE,
@@ -81,6 +85,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     groups=groups,
                                     reduction=reduction,
                                     kernel_regularizer=kernel_regularizer,
+                                    kernel_initializer=kernel_initializer,
                                     use_se=use_se) for _ in range(ENC_CONV_BLOCK1_NUM)]
         self.conv_downsamp_1 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK1_SIZE,
@@ -88,7 +93,8 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     strides=2,
                                     padding='same',
                                     data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer)
+                                    kernel_regularizer=kernel_regularizer,
+                                    kernel_initializer=kernel_initializer)
 
         # Third ConvBlock: filters=128, x2.
         self.conv_block_2 = [ConvBlock(filters=ENC_CONV_BLOCK2_SIZE,
@@ -97,6 +103,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     groups=groups,
                                     reduction=reduction,
                                     kernel_regularizer=kernel_regularizer,
+                                    kernel_initializer=kernel_initializer,
                                     use_se=use_se) for _ in range(ENC_CONV_BLOCK2_NUM)]
         self.conv_downsamp_2 = tf.keras.layers.Conv3D(
                                     filters=ENC_CONV_BLOCK2_SIZE,
@@ -104,6 +111,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     strides=2,
                                     padding='same',
                                     data_format=data_format,
+                                    kernel_initializer=kernel_initializer,
                                     kernel_regularizer=kernel_regularizer)
 
         # Fourth ConvBlock: filters=256, x4.
@@ -113,6 +121,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                     groups=groups,
                                     reduction=reduction,
                                     kernel_regularizer=kernel_regularizer,
+                                    kernel_initializer=kernel_initializer,
                                     use_se=use_se) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
     def call(self, inputs):

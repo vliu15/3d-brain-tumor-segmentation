@@ -3,8 +3,8 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.losses import DiceLoss, FocalLoss
-from utils.metrics import DiceCoefficient
+from utils.losses import DiceLoss
+from utils.metrics import DiceCoefficient, HausdorffDistance
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
 from utils.utils import prepare_dataset
@@ -52,12 +52,14 @@ def custom_train(args):
     train_prec = tf.keras.metrics.Precision(name='train_prec')
     train_reca = tf.keras.metrics.Recall(name='train_reca')
     train_dice = DiceCoefficient(name='train_dice', data_format=args.data_format)
+    train_haus = HausdorffDistance(name='train_haus')
 
     val_loss = tf.keras.metrics.Mean(name='val_loss')
     val_accu = tf.keras.metrics.BinaryAccuracy(name='val_accu')
     val_prec = tf.keras.metrics.Precision(name='val_prec')
     val_reca = tf.keras.metrics.Recall(name='val_reca')
     val_dice = DiceCoefficient(name='val_dice', data_format=args.data_format)
+    val_haus = HausdorffDistance(name='val_haus')
 
     # Load model weights if specified.
     if args.load_file:
@@ -73,11 +75,13 @@ def custom_train(args):
                                'train_prec',
                                'train_reca',
                                'train_dice',
+                               'train_haus',
                                'val_loss',
                                'val_accu',
                                'val_prec',
                                'val_reca',
-                               'val_dice'])
+                               'val_dice',
+                               'val_haus'])
             f.write(header + '\n')
 
     best_val_loss = float('inf')
@@ -111,22 +115,27 @@ def custom_train(args):
                 train_prec.update_state(y, y_pred)
                 train_reca.update_state(y, y_pred)
                 train_dice.update_state(y, y_pred)
+                train_haus.update_state(y, y_pred)
 
             # Output loss to console.
             if args.log_steps > 0 and step % args.log_steps == 0:
-                print('Step {}. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
+                print('Step {}. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
+                       Reca: {r: 1.4f}, Dice: {d: 1.4f}, Haus: {h: .4f}.'
                        .format(step, l=train_loss.result(),
                                      v=train_accu.result(),
                                      p=train_prec.result(),
                                      r=train_reca.result(),
-                                     d=train_dice.result()))
+                                     d=train_dice.result(),
+                                     h=train_haus.result()))
 
-        print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
+        print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
+               Reca: {r: 1.4f}, Dice: {d: 1.4f}, Haus: {h: .4f}.'
                        .format(l=train_loss.result(),
                                v=train_accu.result(),
                                p=train_prec.result(),
                                r=train_reca.result(),
-                               d=train_dice.result()))
+                               d=train_dice.result(),
+                               h=train_haus.result()))
 
         # Validation epoch.
         for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
@@ -141,13 +150,16 @@ def custom_train(args):
                 val_prec.update_state(y, y_pred)
                 val_reca.update_state(y, y_pred)
                 val_dice.update_state(y, y_pred)
+                val_haus.update_state(y, y_pred)
 
-        print('Validation. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
+        print('Validation. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
+               Reca: {r: 1.4f}, Dice: {d: 1.4f}, Haus: {h: .4f}.'
                        .format(l=val_loss.result(),
                                v=val_accu.result(),
                                p=val_prec.result(),
                                r=val_reca.result(),
-                               d=val_dice.result()))
+                               d=val_dice.result(),
+                               h=val_haus.result()))
 
         # Write logs.
         if args.log_file:
@@ -159,11 +171,13 @@ def custom_train(args):
                                   str(train_prec.result().numpy()),
                                   str(train_reca.result().numpy()),
                                   str(train_dice.result().numpy()),
+                                  str(train_haus.resull().numpy()),
                                   str(val_loss.result().numpy()),
                                   str(val_prec.result().numpy()),
                                   str(val_reca.result().numpy()),
                                   str(val_accu.result().numpy()),
-                                  str(val_dice.result().numpy())])
+                                  str(val_dice.result().numpy()),
+                                  str(val_haus.result().numpy())])
                 f.write(entry + '\n')
 
         # Checkpoint and patience.
@@ -185,11 +199,13 @@ def custom_train(args):
         train_prec.reset_states()
         train_reca.reset_states()
         train_dice.reset_states()
+        train_haus.reset_states()
         val_loss.reset_states()
         val_accu.reset_states()
         val_prec.reset_states()
         val_reca.reset_states()
         val_dice.reset_states()
+        val_haus.reset_states()
 
 
 def keras_train(args):
@@ -223,7 +239,8 @@ def keras_train(args):
                       metrics=[tf.keras.metrics.Accuracy(),
                                tf.keras.metrics.Precision(),
                                tf.keras.metrics.Recall(),
-                               DiceCoefficient(data_format=args.data_format)])
+                               DiceCoefficient(data_format=args.data_format),
+                               HausdorffDistance()])
 
         history = model.fit(train_data,
                             epochs=args.n_epochs,
