@@ -15,7 +15,7 @@ def get_npy_image(subject_folder, name):
         file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii.gz'))[0]
     except:
         file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii'))[0]
-    return np.array(nib.load(file_card).dataobj)
+    return np.array(nib.load(file_card).dataobj).astype(np.float32)
 
 
 def create_dataset(brats_folder, data_format='channels_last'):

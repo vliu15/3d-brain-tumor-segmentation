@@ -25,11 +25,13 @@ def custom_train(args):
                     data_format=args.data_format,
                     kernel_size=args.conv_kernel_size,
                     groups=args.gn_groups,
+                    reduction=args.se_reduction,
+                    use_se=args.use_se,
                     kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale))
 
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
-                                    else [1] + list(CHANNELS_LAST_X_SHAPE)))
+                                    else [1] + list(CHANNELS_FIRST_X_SHAPE)))
 
     # Get starting epoch.
     start_epoch = model.epoch.value().numpy()
@@ -43,7 +45,6 @@ def custom_train(args):
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss and metrics.
-    # loss_fn = FocalLoss(gamma=2, alpha=0.25, smoothing=0.0, data_format=args.data_format)
     loss_fn = DiceLoss(data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')

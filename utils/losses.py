@@ -36,6 +36,7 @@ class DiceLoss(tf.keras.losses.Loss):
                     format of the data, for determining the axis to compute loss over.
         """
         super(DiceLoss, self).__init__(name=name)
+        assert eps <= 1 and eps > 0, '`eps` needs to be in the range (0, 1].'
         self.data_format = data_format
         self.eps = eps
 
@@ -116,8 +117,8 @@ class FocalLoss(tf.keras.losses.Loss):
     """Implementation of focal loss: https://arxiv.org/pdf/1708.02002.pdf."""
     def __init__(self,
                  smoothing=1e-4,
-                 gamma=4,
-                 alpha=0.2,
+                 gamma=2,
+                 alpha=0.25,
                  name='focal_loss',
                  data_format='channels_last'):
         """Initializes FocalLoss class and sets attributes needed in loss calculation.
@@ -160,20 +161,11 @@ class FocalLoss(tf.keras.losses.Loss):
         if self.smoothing > 0:
             y_true = y_true * (1.0 - self.smoothing) + (1.0 - y_true) * self.smoothing
 
-        f_loss = -self.alpha * ((1. - y_pred) ** self.gamma) * y_true * tf.math.log(y_pred)
-        f_loss -= (1. - self.alpha) * (y_pred ** self.gamma) * (1. - y_true) * tf.math.log(y_pred)
-        return tf.reduce_mean(f_loss)
+        # Apply p to y=1 and (1-p) to (y!=1) positions.
+        y_pred = y_true * y_pred + (1.0 - y_true) * (1.0 - y_pred)
 
+        # Apply self.alpha for class rebalancing.
+        alpha = y_true * self.alpha + (1.0 - y_true) * (1.0 - self.alpha)
 
-class CustomLoss(tf.keras.losses.Loss):
-    """Custom loss class for weighted combinations of various losses."""
-    def __init__(self,
-                 name='custom_loss',
-                 data_format='channels_last'):
-        super(CustomLoss, self).__init__(name=name)
-        self.dice_loss = DiceLoss(data_format=data_format)
-        self.focal_loss = FocalLoss(data_format=data_format)
-
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        return FL_WEIGHT * self.focal_loss(y_true, y_pred) + \
-                DL_WEIGHT * self.dice_loss(y_true, y_pred)
+        focus = (1 - y_pred) ** self.gamma
+        return -tf.reduce_sum(alpha * focus * tf.math.log(y_pred))

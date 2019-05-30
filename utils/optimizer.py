@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-BASE_LR = 1e-6
+BASE_LR = 1e-5 # Learning rate to start warmup from
 
 
 class ScheduledAdam(tf.keras.optimizers.Adam):

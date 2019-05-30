@@ -155,6 +155,7 @@ class ConvBlock(tf.keras.layers.Layer):
             { Conv3D_pointwise -> ConvLayer -> ConvLayer -> Residual }
         """
         if self.use_se:
+            inputs = self.conv3d_ptwise(inputs)
             res = self.scale([self.se_layer(inputs), inputs])
         else:
             res = self.conv3d_ptwise(inputs)
