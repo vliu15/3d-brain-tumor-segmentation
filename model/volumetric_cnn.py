@@ -10,7 +10,7 @@ class VolumetricCNN(tf.keras.models.Model):
                  data_format='channels_last',
                  kernel_size=3,
                  groups=8,
-                 reduction=4,
+                 reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
                  use_se=False):
@@ -82,7 +82,7 @@ class EncDecCNN(tf.keras.models.Model):
                  data_format='channels_last',
                  kernel_size=3,
                  groups=8,
-                 reduction=4,
+                 reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
                  use_se=False):

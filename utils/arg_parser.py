@@ -20,9 +20,9 @@ def prepro_parser():
     parser.add_argument('--norm', type=str, default='image',
             choices=['image', 'pixel'],
             help='Type of normalization to apply.')
-    parser.add_argument('--mirror_prob', type=float, default=0.5,
+    parser.add_argument('--mirror_prob', type=float, default=0.75,
             help='Probability that each inputs are flipped across all 3 axes.')
-    parser.add_argument('--n_crops', type=int, default=1,
+    parser.add_argument('--n_crops', type=int, default=3,
             help='Number of random crops to sample per image.')
 
     args = parser.parse_args()
@@ -79,7 +79,7 @@ def train_parser():
             help='Size of groups for group normalization.')
     parser.add_argument('--use_se', action='store_true', default=False,
             help='Whether to use SENet blocks instead of ResNet blocks.')
-    parser.add_argument('--se_reduction', type=int, default=4,
+    parser.add_argument('--se_reduction', type=int, default=2,
             help='Reduction ratio in excitation layers of SENet blocks.')
     parser.add_argument('--l2_scale', type=float, default=1e-5,
             help='Scale of L2-regularization for convolution kernel weights.')

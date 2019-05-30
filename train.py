@@ -101,7 +101,6 @@ def custom_train(args):
                     # Forward and loss.
                     y_pred = model(X, training=True)
                     loss = loss_fn(y, y_pred)
-                    print(tf.reduce_sum(model.losses))
                     loss += tf.reduce_sum(model.losses)
 
                 # Gradients and backward.
@@ -257,5 +256,8 @@ def keras_train(args):
 
 if __name__ == '__main__':
     args = train_parser()
+
+    print('Train args: {}'.format(args), flush=True)
+
     custom_train(args)
     # history = keras_train(args)

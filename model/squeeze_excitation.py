@@ -3,7 +3,7 @@ import tensorflow as tf
 
 class SqueezeExcitation(tf.keras.layers.Layer):
     def __init__(self,
-                 reduction=4,
+                 reduction=2,
                  data_format='channels_last',
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal'):

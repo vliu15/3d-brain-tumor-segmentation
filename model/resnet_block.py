@@ -79,7 +79,7 @@ class ConvBlock(tf.keras.layers.Layer):
                  kernel_size=3,
                  data_format='channels_last',
                  groups=8,
-                 reduction=4,
+                 reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
                  use_se=False):

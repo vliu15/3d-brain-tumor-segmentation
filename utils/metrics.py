@@ -1,9 +1,8 @@
 import tensorflow as tf
 try:
     from scipy.spatial.distance import directed_hausdorff
-    compute = True
 except:
-    compute = False
+    directed_hausdorff = None
 
 from utils.constants import *
 from utils.utils import pred_to_one_hot
@@ -19,11 +18,11 @@ class HausdorffDistance(tf.keras.metrics.Mean):
 
         y_true = tf.reshape(y_true, shape=(1, -1))
         y_pred = tf.reshape(y_pred, shape=(1, -1))
-        if compute = True
+        if directed_hausdorff:
             return tf.reduce_max(directed_hausdorff(y_true, y_pred)[0],
                                  directed_hausdorff(y_pred, y_true)[0])
         else:
-            raise NotImplemented
+            raise NotImplementedError('Failed to import scipy.spatial.distance.directed_hausdorff.')
 
 
 class DiceCoefficient(tf.keras.metrics.Mean):
