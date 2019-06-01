@@ -93,7 +93,7 @@ def create_mask(y, data_format):
     axis = -1 if data_format == 'channels_last' else 0
 
     # Mask out values that correspond to values < 0.5.
-    mask = tf.reduce_max(d1, axis=axis, keepdims=True)
+    mask = tf.reduce_max(d1, axis=axis)
     mask = tf.cast(mask > 0.5, tf.int32)
 
     # Take the argmax to determine label, but mask out values < 0.5.
@@ -151,6 +151,7 @@ def main(args):
 
             # Create mask.
             mask = create_mask(y, args.data_format).numpy()
+            np.place(mask, mask >= 3, [4])
             np.save(os.path.join(subject_folder, '/mask.npy'), mask)
 
 
