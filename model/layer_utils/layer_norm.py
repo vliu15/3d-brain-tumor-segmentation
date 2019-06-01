@@ -8,7 +8,6 @@ from tensorflow.keras import initializers, constraints, regularizers
 
 class LayerNormalization(tf.keras.layers.Layer):
     def __init__(self,
-                 axis=-1,
                  center=True,
                  scale=True,
                  epsilon=1e-5,
@@ -22,9 +21,6 @@ class LayerNormalization(tf.keras.layers.Layer):
         """[Layer Normalization](https://arxiv.org/pdf/1607.06450.pdf)
 
             Args:
-                axis: int, optional
-                    The axis that should be normalized (typically the
-                    features axis).
                 center: bool, optional
                     Whether to add an offset parameter.
                 scale: bool, optional
@@ -46,7 +42,6 @@ class LayerNormalization(tf.keras.layers.Layer):
         """
         super(LayerNormalization, self).__init__(**kwargs)
         self.supports_masking = True
-        self.axis = axis
         self.center = center
         self.scale = scale
         self.epsilon = epsilon
@@ -81,7 +76,6 @@ class LayerNormalization(tf.keras.layers.Layer):
 
     def call(self, inputs, training=None):
         reduction_axes = list(range(len(input_shape)))
-        del reduction_axes[self.axis]
         del reduction_axes[0]
 
         mean, variance = tf.nn.moments(inputs, axes=reduction_axes, keepdims=True)

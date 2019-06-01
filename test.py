@@ -129,7 +129,8 @@ def main(args):
                         kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
                         kernel_initializer=args.kernel_init,
                         downsampling=args.downsamp,
-                        upsampling=args.upsamp)
+                        upsampling=args.upsamp,
+                        normalization=args.normalization)
 
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
@@ -156,13 +157,18 @@ def main(args):
 
         # Forward pass.
         with tf.device(args.device):
-            y = model(X, training=None)
+            y, *_ = model(X, training=False)
 
             # Create mask.
             mask = create_mask(y, args.data_format).numpy()
+
+            # Replace label `3` with `4` for consistency with data.
             np.place(mask, mask >= 3, [4])
+
+            # Save as Numpy.
             np.save(os.path.join(subject_folder, '/mask.npy'), mask)
 
+            # Save as Nifti.
             convert_to_nii(subject_folder, mask)
 
 
