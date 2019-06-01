@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from model.resnet_block import ConvBlock, ConvLayer
-from model.layers.downsample import ConvDownsample, AvgDownsample, MaxDownsample
+from model.layer_utils.downsample import ConvDownsample, AvgDownsample, MaxDownsample
 from utils.constants import *
 
 

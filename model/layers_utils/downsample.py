@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from model.layers.group_norm import GroupNormalization
+from model.layer_utils.group_norm import GroupNormalization
 
 
 class ConvDownsample(tf.keras.layers.Layer):
