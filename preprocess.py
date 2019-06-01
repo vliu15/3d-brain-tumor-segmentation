@@ -94,13 +94,6 @@ def image_norm(X_train, data_format='channels_last'):
 
 
 def pixel_norm(X_train, data_format='channels_last'):
-    if data_format == 'channels_last':
-        get_mean = lambda X, h, w, d, c: X[:, h, w, d, c].mean()
-        get_std = lambda X, h, w, d, c: X[:, h, w, d, c].std()
-    elif data_format == 'channels_first':
-        get_mean = lambda X, h, w, d, c: X[:, c, h, w, d].mean()
-        get_std = lambda X, h, w, d, c: X[:, c, h, w, d].std()
-
     # Compute mean and std for each position.
     voxel_mean = np.zeros_like(X_train[0])
     voxel_std = np.zeros_like(X_train[0])
@@ -108,8 +101,12 @@ def pixel_norm(X_train, data_format='channels_last'):
         for w in range(W):
             for d in range(D):
                 for c in range(IN_CH):
-                    voxel_mean[h, w, d, c] = get_mean(X_train, h, w, d, c)
-                    voxel_std[h, w, d, c] = get_std(X_train, h, w, d, c)
+                    if data_format == 'channels_last':
+                        voxel_mean[h, w, d, c] = X[:, h, w, d, c].mean()
+                        voxel_std[h, w, d, c] = X[:, h, w, d, c].std()
+                    elif data_format == 'channels_first':
+                        voxel_mean[c, h, w, d] = X[:, c, h, w, d].mean()
+                        voxel_std[c, h, w, d] = X[:, c, h, w, d].std()
 
     return voxel_mean, voxel_std
 

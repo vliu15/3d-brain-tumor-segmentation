@@ -2,6 +2,29 @@ import argparse
 import os
 
 
+def add_model_args(parser):
+    parser.add_argument('--conv_kernel_size', type=int, default=3,
+            help='Size of convolutional kernels throughout the model.')
+    parser.add_argument('--gn_groups', type=int, default=8,
+            help='Size of groups for group normalization.')
+    parser.add_argument('--use_se', action='store_true', default=False,
+            help='Whether to use SENet blocks instead of ResNet blocks.')
+    parser.add_argument('--se_reduction', type=int, default=2,
+            help='Reduction ratio in excitation layers of SENet blocks.')
+    parser.add_argument('--l2_scale', type=float, default=1e-5,
+            help='Scale of L2-regularization for convolution kernel weights.')
+    parser.add_argument('--downsamp', type=str, default='max',
+            choices=['max', 'avg', 'conv'],
+            help='Method of downsampling.')
+    parser.add_argument('--upsamp', type=str, default='linear',
+            choices=['linear', 'conv'],
+            help='Method of upsampling.')
+    parser.add_argument('--kernel_init', type=str, default='he_normal',
+            choices=['he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform'],
+            help='Kernel initialization to use for weight initialization.')
+    return parser
+
+
 def prepro_parser():
     parser = argparse.ArgumentParser()
 
@@ -73,25 +96,7 @@ def train_parser():
             help='Batch size to be used in training.')
 
     # Model.
-    parser.add_argument('--conv_kernel_size', type=int, default=3,
-            help='Size of convolutional kernels throughout the model.')
-    parser.add_argument('--gn_groups', type=int, default=8,
-            help='Size of groups for group normalization.')
-    parser.add_argument('--use_se', action='store_true', default=False,
-            help='Whether to use SENet blocks instead of ResNet blocks.')
-    parser.add_argument('--se_reduction', type=int, default=2,
-            help='Reduction ratio in excitation layers of SENet blocks.')
-    parser.add_argument('--l2_scale', type=float, default=1e-5,
-            help='Scale of L2-regularization for convolution kernel weights.')
-    parser.add_argument('--downsamp', type=str, default='max',
-            choices=['max', 'avg', 'conv'],
-            help='Method of downsampling.')
-    parser.add_argument('--upsamp', type=str, default='linear',
-            choices=['linear', 'conv'],
-            help='Method of upsampling.')
-    parser.add_argument('--kernel_init', type=str, default='he_normal',
-            choices=['he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform'],
-            help='Kernel initialization to use for weight initialization.')
+    parser = add_model_args(parser)
 
     args = parser.parse_args()
 
@@ -124,14 +129,7 @@ def test_parser():
             help='Path to dumped preprocessed stats.')
 
     # Model.
-    parser.add_argument('--conv_kernel_size', type=int, default=3,
-            help='Size of convolutional kernels throughout the model.')
-    parser.add_argument('--gn_groups', type=int, default=8,
-            help='Size of groups for group normalization.')
-    parser.add_argument('--dropout', type=float, default=0.2,
-            help='Dropout rate for dropout layer after initial convolution.')
-    parser.add_argument('--l2_scale', type=float, default=1e-5,
-            help='Scale of L2-regularization for convolution kernel weights.')
+    parser = add_model_args(parser)
 
     args = parser.parse_args()
 
