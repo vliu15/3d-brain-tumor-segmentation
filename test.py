@@ -2,6 +2,7 @@ import os
 import glob
 import tensorflow as tf
 import numpy as np
+import nibabel as nib
 
 from utils.arg_parser import test_parser
 from utils.constants import *
@@ -13,6 +14,13 @@ def get_npy_image(subject_folder, name):
     file_card = glob.glob(os.path.join(subject_folder, '*' + name + '_proc.nii'))[0]
     return np.array(nib.load(file_card).dataobj).astype(np.float32)
 
+def convert_to_nii(subject_folder, mask):
+    affine = np.array([[-0.977, 0., 0., 91.1309967],
+                       [0., -0.977, 0., 149.34700012],
+                       [0., 0., 1., -74.67500305],
+                       [0., 0., 0., 1.]])
+    img = nib.Nifti1Image(mask, affine)
+    nib.save(img, os.path.join(subject_folder, '/mask.nii'))
 
 def prepare_image(X, voxel_mean, voxel_std, data_format):
     """Normalize image and sample crops to represent whole input."""
@@ -153,6 +161,8 @@ def main(args):
             mask = create_mask(y, args.data_format).numpy()
             np.place(mask, mask >= 3, [4])
             np.save(os.path.join(subject_folder, '/mask.npy'), mask)
+
+        convert_to_nii(subject_folder, mask)
 
 
 if __name__ == '__main__':
