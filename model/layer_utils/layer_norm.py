@@ -82,6 +82,7 @@ class LayerNormalization(tf.keras.layers.Layer):
     def call(self, inputs, training=None):
         reduction_axes = list(range(len(input_shape)))
         del reduction_axes[self.axis]
+        del reduction_axes[0]
 
         mean, variance = tf.nn.moments(inputs, axes=reduction_axes, keepdims=True)
         std = tf.math.sqrt(variance + self.epsilon)
