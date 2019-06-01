@@ -162,7 +162,7 @@ def main(args):
             np.place(mask, mask >= 3, [4])
             np.save(os.path.join(subject_folder, '/mask.npy'), mask)
 
-        convert_to_nii(subject_folder, mask)
+            convert_to_nii(subject_folder, mask)
 
 
 if __name__ == '__main__':
