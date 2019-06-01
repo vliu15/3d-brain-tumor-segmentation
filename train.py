@@ -30,7 +30,8 @@ def custom_train(args):
                     kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
                     kernel_initializer=args.kernel_init,
                     downsampling=args.downsamp,
-                    upsampling=args.upsamp)
+                    upsampling=args.upsamp,
+                    normalization=args.norm)
 
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'

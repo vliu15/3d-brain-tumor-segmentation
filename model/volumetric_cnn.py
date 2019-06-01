@@ -1,3 +1,4 @@
+"""Contains custom models for 3D semantic segmentation."""
 import tensorflow as tf
 
 from model.encoder import ConvEncoder
@@ -16,7 +17,7 @@ class VolumetricCNN(tf.keras.models.Model):
                  use_se=False,
                  downsampling='max',
                  upsampling='linear',
-                 **kwargs):
+                 normalization='group'):
         """Initializes the VolumetricCNN model.
         
             Modified model with SENet blocks instead of ResNet blocks:
@@ -53,7 +54,7 @@ class VolumetricCNN(tf.keras.models.Model):
                             kernel_initializer=kernel_initializer,
                             use_se=use_se,
                             downsampling=downsampling,
-                            **kwargs)
+                            normalization=normalization)
         self.decoder = ConvDecoder(
                             data_format=data_format,
                             kernel_size=kernel_size,
@@ -63,7 +64,7 @@ class VolumetricCNN(tf.keras.models.Model):
                             kernel_initializer=kernel_initializer,
                             use_se=use_se,
                             upsampling=upsampling,
-                            **kwargs)
+                            normalization=normalization)
         self.vae = VariationalAutoencoder(
                             data_format=data_format,
                             kernel_size=kernel_size,
@@ -72,8 +73,9 @@ class VolumetricCNN(tf.keras.models.Model):
                             kernel_regularizer=kernel_regularizer,
                             kernel_initializer=kernel_initializer,
                             use_se=use_se,
+                            downsampling=downsampling,
                             upsampling=upsampling,
-                            **kwargs)
+                            normalization=normalization)
 
     def call(self, inputs, training=False):
         """Returns the forward pass of the VolumetricCNN model.
@@ -98,7 +100,7 @@ class EncDecCNN(tf.keras.models.Model):
                  use_se=False,
                  downsampling='max',
                  upsampling='linear',
-                 **kwargs):
+                 normalization='group'):
         """Initializes the EncDecCNN model.
         
             This is the VolumetricCNN model without the variational
@@ -135,7 +137,7 @@ class EncDecCNN(tf.keras.models.Model):
                             kernel_initializer=kernel_initializer,
                             use_se=use_se,
                             downsampling=downsampling,
-                            **kwargs)
+                            normalization=normalization)
         self.decoder = ConvDecoder(
                             data_format=data_format,
                             kernel_size=kernel_size,
@@ -145,7 +147,7 @@ class EncDecCNN(tf.keras.models.Model):
                             kernel_initializer=kernel_initializer,
                             use_se=use_se,
                             upsampling=upsampling,
-                            **kwargs)
+                            normalization=normalization)
 
     def call(self, inputs, training=False):
         """Returns the forward pass of the EncDecCNN model.

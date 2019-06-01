@@ -1,3 +1,4 @@
+"""Contains squeeze-excitation enhancement layer class."""
 import tensorflow as tf
 
 
@@ -6,8 +7,7 @@ class SqueezeExcitation(tf.keras.layers.Layer):
                  reduction=2,
                  data_format='channels_last',
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer='he_normal',
-                 **kwargs):
+                 kernel_initializer='he_normal'):
         """Initializes one squeeze-excitation layer.
         
             See https://arxiv.org/pdf/1709.01507.pdf for details.

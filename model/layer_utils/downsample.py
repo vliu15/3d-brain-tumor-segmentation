@@ -1,6 +1,7 @@
+"""Contains custom downsampling classes."""
 import tensorflow as tf
 
-from model.layer_utils.group_norm import GroupNormalization
+from model.layer_utils.getters import get_normalization
 
 
 class ConvDownsample(tf.keras.layers.Layer):
@@ -11,6 +12,7 @@ class ConvDownsample(tf.keras.layers.Layer):
                  groups=8,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
+                 normalization='group',
                  **kwargs):
         super(ConvDownsample, self).__init__()
         self.config = super(ConvDownsample, self).get_config()
@@ -19,7 +21,11 @@ class ConvDownsample(tf.keras.layers.Layer):
                             'kernel_size': kernel_size,
                             'groups': groups,
                             'kernel_regularizer': kernel_regularizer,
-                            'kernel_initializer': kernel_initializer})
+                            'kernel_initializer': kernel_initializer,
+                            'normalization': normalization})
+
+        # Retrieve normalization layer.
+        Normalization = get_normalization(normalization)
 
         self.conv = tf.keras.layers.Conv3D(
                                 filters=filters,
@@ -28,17 +34,19 @@ class ConvDownsample(tf.keras.layers.Layer):
                                 padding='same',
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                **kwargs)
-        self.groupnorm = GroupNormalization(
-                                groups=groups,
-                                axis=-1 if data_format == 'channels_last' else 1,
-                                **kwargs)
+                                kernel_initializer=kernel_initializer)
+        try:
+            self.norm = Normalization(
+                            groups=groups,
+                            axis=-1 if data_format == 'channels_last' else 1)
+        except:
+            self.norm = Normalization(
+                            axis=-1 if data_format == 'channels_last' else 1)
         self.relu = tf.keras.layers.Activation('relu')
 
     def __call__(self, inputs, training=False):
         inputs = self.conv(inputs)
-        inputs = self.groupnorm(inputs, training=training)
+        inputs = self.norm(inputs, training=training)
         inputs = self.relu(inputs)
         return inputs
 
@@ -58,8 +66,7 @@ class AvgDownsample(tf.keras.layers.Layer):
                             pool_size=2,
                             strides=2,
                             padding='same',
-                            data_format=data_format
-                            **kwargs)
+                            data_format=data_format)
 
     def __call__(self, inputs, training=False):
         inputs = self.avgpool(inputs)
@@ -81,11 +88,10 @@ class MaxDownsample(tf.keras.layers.Layer):
                             pool_size=2,
                             strides=2,
                             padding='same',
-                            data_format=data_format,
-                            **kwargs)
+                            data_format=data_format)
 
     def __call__(self, inputs, training=False):
-        inputs = self.maxpool(inputs, training=training)
+        inputs = self.maxpool(inputs)
         return inputs
 
     def get_config(self):

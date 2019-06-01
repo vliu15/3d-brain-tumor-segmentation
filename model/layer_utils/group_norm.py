@@ -1,5 +1,5 @@
 """
-    Taken from
+    Contains Keras group normalization class from
     https://github.com/titu1994/Keras-Group-Normalization/blob/master/group_norm.py
 """
 import tensorflow as tf

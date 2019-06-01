@@ -3,6 +3,18 @@ import os
 
 
 def add_model_args(parser):
+    # Architectural
+    parser.add_argument('--downsamp', type=str, default='max',
+            choices=['max', 'avg', 'conv'],
+            help='Method of downsampling.')
+    parser.add_argument('--upsamp', type=str, default='linear',
+            choices=['linear', 'conv'],
+            help='Method of upsampling.')
+    parser.add_argument('--norm', type=str, default='group',
+            choices=['group', 'batch'],
+            help='Which normalization to use throughout the network.')
+    
+    # Parameters
     parser.add_argument('--conv_kernel_size', type=int, default=3,
             help='Size of convolutional kernels throughout the model.')
     parser.add_argument('--gn_groups', type=int, default=8,
@@ -13,12 +25,6 @@ def add_model_args(parser):
             help='Reduction ratio in excitation layers of SENet blocks.')
     parser.add_argument('--l2_scale', type=float, default=1e-5,
             help='Scale of L2-regularization for convolution kernel weights.')
-    parser.add_argument('--downsamp', type=str, default='max',
-            choices=['max', 'avg', 'conv'],
-            help='Method of downsampling.')
-    parser.add_argument('--upsamp', type=str, default='linear',
-            choices=['linear', 'conv'],
-            help='Method of upsampling.')
     parser.add_argument('--kernel_init', type=str, default='he_normal',
             choices=['he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform'],
             help='Kernel initialization to use for weight initialization.')
