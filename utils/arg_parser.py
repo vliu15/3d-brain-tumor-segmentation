@@ -65,7 +65,7 @@ def train_parser():
     # Optimization.
     parser.add_argument('--n_epochs', type=int, default=300,
             help='Total number of epochs to train for.')
-    parser.add_argument('--lr', type=float, default=1e-4,
+    parser.add_argument('--lr', type=float, default=1e-5,
             help='Initial learning rate of Adam optimizer.')
     parser.add_argument('--warmup_epochs', type=int, default=10,
             help='Number of epochs for learning rate warmup.')

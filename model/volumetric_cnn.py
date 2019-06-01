@@ -13,7 +13,10 @@ class VolumetricCNN(tf.keras.models.Model):
                  reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False):
+                 use_se=False,
+                 downsampling='max',
+                 upsampling='linear',
+                 **kwargs):
         """Initializes the VolumetricCNN model.
         
             Modified model with SENet blocks instead of ResNet blocks:
@@ -41,29 +44,9 @@ class VolumetricCNN(tf.keras.models.Model):
         """
         super(VolumetricCNN, self).__init__()
         self.epoch = tf.Variable(0, name='epoch', trainable=False)
-        self.encoder = ConvEncoder(
-                                data_format=data_format,
-                                kernel_size=kernel_size,
-                                groups=groups,
-                                reduction=reduction,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                use_se=use_se)
-        self.decoder = ConvDecoder(
-                                data_format=data_format,
-                                kernel_size=kernel_size,
-                                groups=groups,
-                                reduction=reduction,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                use_se=use_se)
-        self.vae = VariationalAutoencoder(
-                                data_format=data_format,
-                                kernel_size=kernel_size,
-                                groups=groups,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                use_se=use_se)
+        self.encoder = ConvEncoder(**kwargs)
+        self.decoder = ConvDecoder(**kwargs)
+        self.vae = VariationalAutoencoder(**kwargs)
 
     def call(self, inputs, training=False):
         """Returns the forward pass of the VolumetricCNN model.
@@ -74,7 +57,7 @@ class VolumetricCNN(tf.keras.models.Model):
         y_pred = self.decoder(enc_outs)
         y_vae, z_mean, z_logvar = self.vae(enc_outs[-1])
 
-        return y_pred, y_vae, z_mean, z_logvar
+        return (y_pred, y_vae, z_mean, z_logvar)
 
 
 class EncDecCNN(tf.keras.models.Model):

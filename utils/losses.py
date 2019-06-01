@@ -4,16 +4,16 @@ from utils.constants import *
 
 
 class L2Loss(tf.keras.losses.Loss):
-    def __init__(self, name='l2_loss'):
-        super(L2Loss, self).__init__(name=name)
+    def __init__(self, name='l2_loss', **kwargs):
+        super(L2Loss, self).__init__(**kwargs)
 
     def __call__(self, y_true, y_pred, sample_weight=None):
-        return tf.reduce_sum((y_true - y_pred) ** 2)
+        return tf.losses.mse(y_true, y_pred)
 
 
 class KullbackLeiblerLoss(tf.keras.losses.Loss):
-    def __init__(self, name='kl_loss'):
-        super(KullbackLeiblerLoss, self).__init__(name=name)
+    def __init__(self, name='kl_loss', **kwargs):
+        super(KullbackLeiblerLoss, self).__init__(**kwargs)
 
     def __call__(self, y_true, y_pred, sample_weight=None):
         return tf.keras.losses.kld(y_true, y_pred)
@@ -24,7 +24,8 @@ class DiceLoss(tf.keras.losses.Loss):
     def __init__(self,
                  name='dice_loss',
                  eps=1.0,
-                 data_format='channels_last'):
+                 data_format='channels_last',
+                 **kwargs):
         """Initializes DiceLoss class and sets attributes needed to calculate loss.
 
             Args:
@@ -35,7 +36,7 @@ class DiceLoss(tf.keras.losses.Loss):
                 data_format: str, optional
                     format of the data, for determining the axis to compute loss over.
         """
-        super(DiceLoss, self).__init__(name=name)
+        super(DiceLoss, self).__init__(**kwargs)
         assert eps <= 1 and eps > 0, '`eps` needs to be in the range (0, 1].'
         self.data_format = data_format
         self.eps = eps
@@ -67,7 +68,8 @@ class CrossEntropyLoss(tf.keras.losses.Loss):
                  smoothing=1e-4,
                  alpha=0.0,
                  name='cross_entropy_loss',
-                 data_format='channels_last'):
+                 data_format='channels_last',
+                 **kwargs):
         """Initializes CrossEntropyLoss class and sets attributes needed to calculate loss.
         
             Args:
@@ -81,7 +83,7 @@ class CrossEntropyLoss(tf.keras.losses.Loss):
                 data_format: str, optional
                     format of the data, for determining the axis to compute loss over.
         """
-        super(CrossEntropyLoss, self).__init__(name=name)
+        super(CrossEntropyLoss, self).__init__(**kwargs)
         assert smoothing <= 1 and smoothing >= 0, '`smoothing` needs to be in the range [0, 1].'
         assert alpha <= 1 and alpha >= 0, '`alpha` needs to be in the range [0, 1].'
         self.smoothing = smoothing
@@ -120,7 +122,8 @@ class FocalLoss(tf.keras.losses.Loss):
                  gamma=2,
                  alpha=0.25,
                  name='focal_loss',
-                 data_format='channels_last'):
+                 data_format='channels_last',
+                 **kwargs):
         """Initializes FocalLoss class and sets attributes needed in loss calculation.
 
             Args:
@@ -137,7 +140,7 @@ class FocalLoss(tf.keras.losses.Loss):
                 data_format: str, optional
                     format of the data, for determining the axis to compute loss over.
         """
-        super(FocalLoss, self).__init__(name=name)
+        super(FocalLoss, self).__init__(**kwargs)
         assert smoothing <= 1 and smoothing >= 0, '`smoothing` needs to be in the range [0, 1].'
         assert alpha <= 1 and alpha >= 0, '`alpha` needs to be in the range [0, 1].'
         assert gamma >= 0, '`gamma` needs to be a non-negative integer.'
@@ -169,3 +172,24 @@ class FocalLoss(tf.keras.losses.Loss):
 
         focus = (1 - y_pred) ** self.gamma
         return -tf.reduce_sum(alpha * focus * tf.math.log(y_pred))
+
+class CustomLoss(tf.keras.losses.Loss):
+    def __init__(self,
+                 name='custom_loss',
+                 eps=1.0,
+                 data_format='channels_last',
+                 **kwargs):
+        super(CustomLoss, self).__init__(**kwargs)
+        self.l2_loss = L2Loss(name='l2', **kwargs)
+        self.kl_loss = KullbackLeiblerLoss(name='kl', **kwargs)
+        self.dice_loss = DiceLoss(name='dice', **kwargs)
+
+    def __call__(self, x, y_true, y_pred, y_vae, z_mean, z_logvar, sample_weight=None):
+        n = tf.cast(tf.reduce_prod(x.shape), tf.float32)
+        return self.dice_loss(y_true, y_pred) + \
+                0.1 * self.l2_loss(x, y_vae) + \
+                0.1 / n * self.kl_distribution_loss(z_mean, z_logvar)
+
+    @staticmethod
+    def kl_distribution_loss(mean, logvar):
+        return tf.reduce_sum(mean ** 2 + tf.math.exp(logvar) - logvar - 1)

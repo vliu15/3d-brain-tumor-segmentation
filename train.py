@@ -3,12 +3,12 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.losses import DiceLoss
+from utils.losses import DiceLoss, CustomLoss
 from utils.metrics import DiceCoefficient
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
 from utils.utils import prepare_dataset
-from model.volumetric_cnn import EncDecCNN
+from model.volumetric_cnn import VolumetricCNN
 
 
 def custom_train(args):
@@ -21,7 +21,7 @@ def custom_train(args):
     print('{} validation examples.'.format(n_val))
 
     # Initialize model.
-    model = EncDecCNN(
+    model = VolumetricCNN(
                     data_format=args.data_format,
                     kernel_size=args.conv_kernel_size,
                     groups=args.gn_groups,
@@ -48,7 +48,8 @@ def custom_train(args):
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss and metrics.
-    loss_fn = DiceLoss(data_format=args.data_format)
+    # loss_fn = DiceLoss(data_format=args.data_format)
+    loss_fn = CustomLoss(data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accu = tf.keras.metrics.BinaryAccuracy(name='train_accu')
@@ -101,8 +102,8 @@ def custom_train(args):
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
-                    y_pred = model(X, training=True)
-                    loss = loss_fn(y, y_pred)
+                    y_pred, y_vae, z_mean, z_logvar = model(X, training=True)
+                    loss = loss_fn(X, y, y_pred, y_vae, z_mean, z_logvar)
                     loss += tf.reduce_sum(model.losses)
 
                 # Gradients and backward.
@@ -136,8 +137,8 @@ def custom_train(args):
         for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
             with tf.device(args.device):
                 # Forward and loss.
-                y_pred = model(X, training=False)
-                loss = loss_fn(y, y_pred)
+                y_pred, y_vae, z_mean, z_logvar = model(X, training=True)
+                loss = loss_fn(X, y, y_pred, y_vae, z_mean, z_logvar)
                 loss += tf.reduce_sum(model.losses)
 
                 val_loss.update_state(loss)
