@@ -44,7 +44,7 @@ class ConvDownsample(tf.keras.layers.Layer):
                             axis=-1 if data_format == 'channels_last' else 1)
         self.relu = tf.keras.layers.Activation('relu')
 
-    def __call__(self, inputs, training=False):
+    def __call__(self, inputs, training=None):
         inputs = self.conv(inputs)
         inputs = self.norm(inputs, training=training)
         inputs = self.relu(inputs)
@@ -68,7 +68,7 @@ class AvgDownsample(tf.keras.layers.Layer):
                             padding='same',
                             data_format=data_format)
 
-    def __call__(self, inputs, training=False):
+    def __call__(self, inputs, training=None):
         inputs = self.avgpool(inputs)
         return inputs
 
@@ -90,7 +90,7 @@ class MaxDownsample(tf.keras.layers.Layer):
                             padding='same',
                             data_format=data_format)
 
-    def __call__(self, inputs, training=False):
+    def __call__(self, inputs, training=None):
         inputs = self.maxpool(inputs)
         return inputs
 

@@ -43,7 +43,7 @@ class ConvUpsample(tf.keras.layers.Layer):
                             axis=-1 if data_format == 'channels_last' else 1)
         self.relu = tf.keras.layers.Activation('relu')
 
-    def __call__(self, inputs, training=False):
+    def __call__(self, inputs, training=None):
         inputs = self.conv(inputs)
         inputs = self.norm(inputs, training=training)
         inputs = self.relu(inputs)
@@ -65,7 +65,7 @@ class LinearUpsample(tf.keras.layers.Layer):
                                 size=2,
                                 data_format=data_format)
 
-    def __call__(self, inputs, training=False):
+    def __call__(self, inputs, training=None):
         inputs = self.linear(inputs)
         return inputs
 

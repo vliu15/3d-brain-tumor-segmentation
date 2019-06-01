@@ -77,7 +77,7 @@ class VolumetricCNN(tf.keras.models.Model):
                             upsampling=upsampling,
                             normalization=normalization)
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
         """Returns the forward pass of the VolumetricCNN model.
         
             { Encoder -> [Decoder + Residuals, VAE] }
@@ -149,7 +149,7 @@ class EncDecCNN(tf.keras.models.Model):
                             upsampling=upsampling,
                             normalization=normalization)
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
         """Returns the forward pass of the EncDecCNN model.
         
             { Encoder -> Decoder + Residuals }

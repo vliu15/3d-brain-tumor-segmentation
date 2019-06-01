@@ -142,7 +142,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 use_se=use_se,
                                 normalization=normalization) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
         """Returns the forward pass of the ConvEncoder.
 
             {

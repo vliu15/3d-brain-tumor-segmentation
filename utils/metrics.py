@@ -1,3 +1,4 @@
+"""Contains custom metrics for evaluation."""
 import tensorflow as tf
 try:
     from scipy.spatial.distance import directed_hausdorff

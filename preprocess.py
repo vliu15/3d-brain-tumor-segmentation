@@ -1,3 +1,4 @@
+"""Contains preprocessing script."""
 import glob
 import os
 import random

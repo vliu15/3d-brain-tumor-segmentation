@@ -7,50 +7,46 @@ from tensorflow.keras import initializers, constraints, regularizers
 
 
 class GroupNormalization(tf.keras.layers.Layer):
-    """Group normalization layer.
+    def __init__(self,
+                 groups=8,
+                 axis=-1,
+                 epsilon=1e-5,
+                 center=True,
+                 scale=True,
+                 beta_initializer='zeros',
+                 gamma_initializer='ones',
+                 beta_regularizer=None,
+                 gamma_regularizer=None,
+                 beta_constraint=None,
+                 gamma_constraint=None,
+                 **kwargs):
+        """[Group Normalization](https://arxiv.org/abs/1803.08494)
 
-        Group Normalization divides the channels into groups and computes
-        within each group the mean and variance for normalization. GN's
-        computation is independent of batch sizes, and its accuracy is stable
-        in a wide range of batch sizes.
-    
-        Args:
-            groups (int): the number of groups for Group Normalization.
-            axis (int): the axis that should be normalized (typically the
-                features axis). For instance, after a `Conv2D` layer with
-                `data_format="channels_first"`, set `axis=1` in
-                `BatchNormalization`.
-            epsilon (float): small value added to variance to avoid dividing
-                by zero.
-            center (bool): if True, add offset of `beta` to normalized tensor.
-                If False, `beta` is ignored.
-            scale (bool): if True, multiply by `gamma`. If False, `gamma` is
-                not used. When the next layer is linear (also e.g. `nn.relu`),
-                this can be disabled since the scaling will be done by the next
-                layer.
-            beta_initializer: initializer for the beta weight.
-            gamma_initializer: initializer for the gamma weight.
-            beta_regularizer: optional regularizer for the beta weight.
-            gamma_regularizer: optional regularizer for the gamma weight.
-            beta_constraint: optional constraint for the beta weight.
-            gamma_constraint: optional constraint for the gamma weight.
-
-        Input shape:
-            Arbitrary. Use the keyword argument `input_shape`
-            (tuple of integers, does not include the samples axis)
-            when using this layer as the first layer in a model.
-
-        Output shape:
-            Same shape as input.
-
-        References:
-            [Group Normalization](https://arxiv.org/abs/1803.08494)
-    """
-
-    def __init__(self, groups=8, axis=1, epsilon=1e-5, center=True, scale=True,
-                    beta_initializer='zeros', gamma_initializer='ones',
-                    beta_regularizer=None, gamma_regularizer=None,
-                    beta_constraint=None, gamma_constraint=None, **kwargs):
+            Args:
+                groups: int, optional
+                    Number of groups for Group Normalization.
+                axis: int, optional
+                    The axis that should be normalized (typically the
+                    features axis).
+                center: bool, optional
+                    Whether to add an offset parameter.
+                scale: bool, optional
+                    Whether to add a scale parameter.
+                epsilon: float, optional
+                    Epsilon for calculating variance.
+                gamma_initializer: str / tf.keras.initializer, optional
+                    Initializer for the gamma weight.
+                beta_initializer: str / tf.keras.initializer, optional
+                    Initializer for the beta weight.
+                gamma_regularizer: str / tf.keras.regularizer, optional
+                    Regularizer for the gamma weight.
+                beta_regularizer: str / tf.keras.regularizer, optional
+                    Regularizer for the beta weight.
+                gamma_constraint: str / tf.keras.constraint, optional
+                    Constraint for the gamma weight.
+                beta_constraint: str / tf.keras.constraint, optional
+                    Constraint for the beta weight.
+        """
         super(GroupNormalization, self).__init__(**kwargs)
         self.supports_masking = True
         self.groups = groups
@@ -106,7 +102,7 @@ class GroupNormalization(tf.keras.layers.Layer):
             self.beta = None
         self.built = True
 
-    def call(self, inputs, training=False, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         input_shape = list(inputs.shape)
 
         # Prepare broadcasting shape.

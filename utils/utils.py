@@ -1,3 +1,4 @@
+"""Contains util functions for working with model inputs and outputs."""
 import tensorflow as tf
 import numpy as np
 

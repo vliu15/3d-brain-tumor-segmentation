@@ -1,3 +1,4 @@
+"""Contains inference script for generating segmentation mask."""
 import os
 import glob
 import tensorflow as tf
@@ -155,7 +156,7 @@ def main(args):
 
         # Forward pass.
         with tf.device(args.device):
-            y = model(X, training=False)
+            y = model(X, training=None)
 
             # Create mask.
             mask = create_mask(y, args.data_format).numpy()

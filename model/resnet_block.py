@@ -70,7 +70,7 @@ class ConvLayer(tf.keras.layers.Layer):
                             axis=-1 if data_format == 'channels_last' else 1)
         self.relu = tf.keras.layers.Activation('relu')
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
         """Returns the forward pass of the ConvLayer.
 
             { Conv3D -> GroupNorm -> ReLU }
@@ -168,7 +168,7 @@ class ConvBlock(tf.keras.layers.Layer):
                                 normalization=normalization)
         self.residual = tf.keras.layers.Add()
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
         """Returns the forward pass of the ConvBlock.
 
             { Conv3D_pointwise -> ConvLayer -> ConvLayer -> Residual }

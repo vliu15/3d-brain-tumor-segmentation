@@ -1,3 +1,4 @@
+"""Handles all command-line argument parsing."""
 import argparse
 import os
 
@@ -11,7 +12,7 @@ def add_model_args(parser):
             choices=['linear', 'conv'],
             help='Method of upsampling.')
     parser.add_argument('--norm', type=str, default='group',
-            choices=['group', 'batch'],
+            choices=['group', 'batch', 'layer'],
             help='Which normalization to use throughout the network.')
     
     # Parameters

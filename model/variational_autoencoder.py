@@ -95,7 +95,7 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                                 use_se=use_se,
                                 normalization=normalization)
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
         """Returns the forward pass of one VariationalAutoencoderBlock.
 
             { Conv3D_ptwise -> Upsample3D -> ConvBlock }
@@ -254,7 +254,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer,
                                     kernel_initializer=kernel_initializer)
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
         """Returns the forward pass of the VariationalAutoencoder.
 
             {

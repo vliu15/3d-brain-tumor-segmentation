@@ -1,3 +1,4 @@
+"""Contains custom loss classes."""
 import tensorflow as tf
 
 from utils.constants import *

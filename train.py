@@ -1,3 +1,4 @@
+"""Contains training loops."""
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
@@ -138,7 +139,7 @@ def custom_train(args):
         for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
             with tf.device(args.device):
                 # Forward and loss.
-                y_pred, y_vae, z_mean, z_logvar = model(X, training=True)
+                y_pred, y_vae, z_mean, z_logvar = model(X, training=False)
                 loss = loss_fn(X, y, y_pred, y_vae, z_mean, z_logvar)
                 loss += tf.reduce_sum(model.losses)
 

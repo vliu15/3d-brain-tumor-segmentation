@@ -1,3 +1,4 @@
+"""Initializes the model module."""
 import model.resnet_block
 import model.encoder
 import model.decoder

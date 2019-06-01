@@ -4,11 +4,14 @@ import tensorflow as tf
 
 def get_normalization(normalization):
     from model.layer_utils.group_norm import GroupNormalization
+    from model.layer_utils.layer_norm import LayerNormalization
 
     if normalization == 'group':
         return GroupNormalization
     elif normalization == 'batch':
         return tf.keras.layers.BatchNormalization
+    elif normalization == 'layer':
+        return LayerNormalization
 
 
 def get_downsampling(downsampling):
@@ -18,7 +21,7 @@ def get_downsampling(downsampling):
         return MaxDownsample
     elif downsampling == 'avg':
         return AvgDownsample
-    else:
+    elif downsampling == 'conv':
         return ConvDownsample
 
 
@@ -27,5 +30,5 @@ def get_upsampling(upsampling):
 
     if upsampling == 'linear':
         return LinearUpsample
-    else:
+    elif upsampling == 'conv':
         return ConvUpsample
