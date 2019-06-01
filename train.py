@@ -28,7 +28,7 @@ def custom_train(args):
                     reduction=args.se_reduction,
                     use_se=args.use_se,
                     kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
-                    kernel_initializer='he_normal',
+                    kernel_initializer=args.kernel_init,
                     downsampling=args.downsamp,
                     upsampling=args.upsamp)
 

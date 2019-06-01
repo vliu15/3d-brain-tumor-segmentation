@@ -89,6 +89,9 @@ def train_parser():
     parser.add_argument('--upsamp', type=str, default='linear',
             choices=['linear', 'conv'],
             help='Method of upsampling.')
+    parser.add_argument('--kernel_init', type=str, default='he_normal',
+            choices=['he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform'],
+            help='Kernel initialization to use for weight initialization.')
 
     args = parser.parse_args()
 
