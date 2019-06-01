@@ -63,6 +63,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
+                            'downsampling': downsampling,
                             'use_se': use_se})
 
         # Retrieve downsampling method.

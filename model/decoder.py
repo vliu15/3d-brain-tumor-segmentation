@@ -63,6 +63,7 @@ class DecoderBlock(tf.keras.layers.Layer):
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
+                            'upsampling': upsampling,
                             'use_se': use_se})
 
         # Retrieve upsampling method.
@@ -144,6 +145,7 @@ class ConvDecoder(tf.keras.layers.Layer):
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
+                            'upsampling': upsampling,
                             'use_se': use_se})
 
         self.dec_block_2 = DecoderBlock(
