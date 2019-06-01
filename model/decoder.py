@@ -74,24 +74,40 @@ class DecoderBlock(tf.keras.layers.Layer):
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 **kwargs)
-        self.upsample = Upsample(**kwargs)
+        self.upsample = Upsample(
+                                filters=filters,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                **kwargs)
         self.residual = tf.keras.layers.Add()
         self.conv_block = ConvBlock(
                                 filters=filters,
                                 kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                use_use=use_se,
                                 **kwargs)
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         """Returns the forward pass of one DecoderBlock.
 
             { Conv3D_ptwise -> Upsample3D -> Residual -> ConvBlock }
         """
         inputs, enc_res = inputs
         inputs = self.conv3d_ptwise(inputs)
-        inputs = self.upsample(inputs)
+        inputs = self.upsample(inputs, training=training)
         inputs = self.residual([inputs, enc_res])
-        inputs = self.conv_block(inputs)
+        inputs = self.conv_block(inputs, training=training)
         return inputs
 
     def get_config(self):
@@ -150,12 +166,36 @@ class ConvDecoder(tf.keras.layers.Layer):
 
         self.dec_block_2 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK2_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                upsampling=upsampling,
+                                use_use=use_use,
                                 **kwargs)
         self.dec_block_1 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK1_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                upsampling=upsampling,
+                                use_use=use_use,
                                 **kwargs)
         self.dec_block_0 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK0_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                upsampling=upsampling,
+                                use_use=use_use,
                                 **kwargs)
 
         self.conv_out = tf.keras.layers.Conv3D(
@@ -163,6 +203,9 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 kernel_size=kernel_size,
                                 strides=1,
                                 padding='same',
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 **kwargs)
 
         self.ptwise_logits = tf.keras.layers.Conv3D(
@@ -171,9 +214,12 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 strides=1,
                                 padding='same',
                                 activation='sigmoid',
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 **kwargs)
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         """Returns the forward pass of the ConvDecoder.
 
             {
@@ -192,16 +238,16 @@ class ConvDecoder(tf.keras.layers.Layer):
                     Output 'image' the same size as the original input image
                     to the encoder, but with 3 channels.
         """
-        enc_out_0, enc_out_1, enc_out_2, x = inputs
+        enc_out_0, enc_out_1, enc_out_2, inputs = inputs
 
-        x = self.dec_block_2((x, enc_out_2))
-        x = self.dec_block_1((x, enc_out_1))
-        x = self.dec_block_0((x, enc_out_0))
+        inputs = self.dec_block_2((inputs, enc_out_2), training=training)
+        inputs = self.dec_block_1((inputs, enc_out_1), training=training)
+        inputs = self.dec_block_0((inputs, enc_out_0), training=training)
 
-        x = self.conv_out(x)
-        x = self.ptwise_logits(x)
+        inputs = self.conv_out(inputs)
+        inputs = self.ptwise_logits(inputs)
 
-        return x
+        return inputs
 
     def get_config(self):
         return self.config

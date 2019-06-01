@@ -44,9 +44,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                 groups: int, optional
                     The size of each group for GroupNormalization. Defaults to
                     8, as used in the paper.
-                dropout: float, optional
-                    The dropout rate after initial convolution. Defaults to 0.2,
-                    as used in the paper.
                 reduction: int, optional
                     Reduction ratio for excitation size in squeeze-excitation layer.
                 kernel_regularizer: tf.keras.regularizer callable, optional
@@ -72,28 +69,88 @@ class ConvEncoder(tf.keras.layers.Layer):
         # Input layers.
         self.inp_conv = ConvLayer(
                                 filters=ENC_CONV_LAYER_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
                                 **kwargs)
 
         # First ConvBlock: filters=32, x1.
-        self.conv_block_0 = [ConvBlock(filters=ENC_CONV_BLOCK0_SIZE, **kwargs)
-                                for _ in range(ENC_CONV_BLOCK0_NUM)]
-        self.conv_downsamp_0 = Downsample(**kwargs)
+        self.conv_block_0 = [ConvBlock(
+                                filters=ENC_CONV_BLOCK0_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                use_use=use_use,
+                                **kwargs) for _ in range(ENC_CONV_BLOCK0_NUM)]
+        self.conv_downsamp_0 = Downsample(
+                                filters=ENC_CONV_BLOCK0_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                **kwargs)
 
         # Second ConvBlock: filters=64, x2.
-        self.conv_block_1 = [ConvBlock(filters=ENC_CONV_BLOCK1_SIZE, **kwargs)
-                                for _ in range(ENC_CONV_BLOCK1_NUM)]
-        self.conv_downsamp_1 = Downsample(**kwargs)
+        self.conv_block_1 = [ConvBlock(
+                                filters=ENC_CONV_BLOCK1_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                use_use=use_use,
+                                **kwargs) for _ in range(ENC_CONV_BLOCK1_NUM)]
+        self.conv_downsamp_1 = Downsample(
+                                filters=ENC_CONV_BLOCK1_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                **kwargs)
 
         # Third ConvBlock: filters=128, x2.
-        self.conv_block_2 = [ConvBlock(filters=ENC_CONV_BLOCK2_SIZE, **kwargs)
-                                for _ in range(ENC_CONV_BLOCK2_NUM)]
-        self.conv_downsamp_2 = Downsample(**kwargs)
+        self.conv_block_2 = [ConvBlock(
+                                filters=ENC_CONV_BLOCK2_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                use_use=use_use,
+                                **kwargs) for _ in range(ENC_CONV_BLOCK2_NUM)]
+        self.conv_downsamp_2 = Downsample(
+                                filters=ENC_CONV_BLOCK2_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                use_use=use_use,
+                                **kwargs)
 
         # Fourth ConvBlock: filters=256, x4.
-        self.conv_block_3 = [ConvBlock(filters=ENC_CONV_BLOCK3_SIZE, **kwargs)
-                                for _ in range(ENC_CONV_BLOCK3_NUM)]
+        self.conv_block_3 = [ConvBlock(
+                                filters=ENC_CONV_BLOCK3_SIZE,
+                                kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_regularizer=kernel_regularizer,
+                                kernel_initializer=kernel_initializer,
+                                use_use=use_use,
+                                **kwargs) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         """Returns the forward pass of the ConvEncoder.
 
             {
@@ -121,25 +178,25 @@ class ConvEncoder(tf.keras.layers.Layer):
 
         # First ConvBlock: filters=32, x1.
         for conv in self.conv_block_0:
-            inputs = conv(inputs)
+            inputs = conv(inputs, training=training)
         conv_out_0 = inputs
-        inputs = self.conv_downsamp_0(inputs)
+        inputs = self.conv_downsamp_0(inputs, training=training)
 
         # Second ConvBlock: filters=64, x2.
         for conv in self.conv_block_1:
-            inputs = conv(inputs)
+            inputs = conv(inputs, training=training)
         conv_out_1 = inputs
-        inputs = self.conv_downsamp_1(inputs)
+        inputs = self.conv_downsamp_1(inputs, training=training)
 
         # Third ConvBlock: filters=128. x2.
         for conv in self.conv_block_2:
-            inputs = conv(inputs)
+            inputs = conv(inputs, training=training)
         conv_out_2 = inputs
-        inputs = self.conv_downsamp_2(inputs)
+        inputs = self.conv_downsamp_2(inputs, training=training)
 
         # Fourth ConvBlock: filters=256, x4.
         for conv in self.conv_block_3:
-            inputs = conv(inputs)
+            inputs = conv(inputs, training=training)
 
         # Return values after each ConvBlock for residuals later.
         return (conv_out_0, conv_out_1, conv_out_2, inputs)

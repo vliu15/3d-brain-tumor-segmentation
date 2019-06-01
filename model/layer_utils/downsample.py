@@ -13,7 +13,7 @@ class ConvDownsample(tf.keras.layers.Layer):
                  kernel_initializer='he_normal',
                  **kwargs):
         super(ConvDownsample, self).__init__()
-        self.config = super(ConvDownsample, self.).get_config()
+        self.config = super(ConvDownsample, self).get_config()
         self.config.update({'filters': filters,
                             'data_format': data_format,
                             'kernel_size': kernel_size,
@@ -28,15 +28,17 @@ class ConvDownsample(tf.keras.layers.Layer):
                                 padding='same',
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
+                                kernel_initializer=kernel_initializer,
+                                **kwargs)
         self.groupnorm = GroupNormalization(
                                 groups=groups,
-                                axis=-1 if data_format == 'channels_last' else 1)
+                                axis=-1 if data_format == 'channels_last' else 1,
+                                **kwargs)
         self.relu = tf.keras.layers.Activation('relu')
 
-    def __call__(self, inputs):
+    def __call__(self, inputs, training=False):
         inputs = self.conv(inputs)
-        inputs = self.groupnorm(inputs)
+        inputs = self.groupnorm(inputs, training=training)
         inputs = self.relu(inputs)
         return inputs
 
@@ -56,9 +58,10 @@ class AvgDownsample(tf.keras.layers.Layer):
                             pool_size=2,
                             strides=2,
                             padding='same',
-                            data_format=data_format)
+                            data_format=data_format
+                            **kwargs)
 
-    def __call__(self, inputs):
+    def __call__(self, inputs, training=False):
         inputs = self.avgpool(inputs)
         return inputs
 
@@ -78,10 +81,11 @@ class MaxDownsample(tf.keras.layers.Layer):
                             pool_size=2,
                             strides=2,
                             padding='same',
-                            data_format=data_format)
+                            data_format=data_format,
+                            **kwargs)
 
-    def __call__(self, inputs):
-        inputs = self.maxpool(inputs)
+    def __call__(self, inputs, training=False):
+        inputs = self.maxpool(inputs, training=training)
         return inputs
 
     def get_config(self):

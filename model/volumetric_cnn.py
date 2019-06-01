@@ -44,18 +44,45 @@ class VolumetricCNN(tf.keras.models.Model):
         """
         super(VolumetricCNN, self).__init__()
         self.epoch = tf.Variable(0, name='epoch', trainable=False)
-        self.encoder = ConvEncoder(**kwargs)
-        self.decoder = ConvDecoder(**kwargs)
-        self.vae = VariationalAutoencoder(**kwargs)
+        self.encoder = ConvEncoder(
+                            data_format=data_format,
+                            kernel_size=kernel_size,
+                            groups=groups,
+                            reduction=reduction,
+                            kernel_regularizer=kernel_regularizer,
+                            kernel_initializer=kernel_initializer,
+                            use_se=use_se,
+                            downsampling=downsampling,
+                            **kwargs)
+        self.decoder = ConvDecoder(
+                            data_format=data_format,
+                            kernel_size=kernel_size,
+                            groups=groups,
+                            reduction=reduction,
+                            kernel_regularizer=kernel_regularizer,
+                            kernel_initializer=kernel_initializer,
+                            use_se=use_se,
+                            upsampling=upsampling,
+                            **kwargs)
+        self.vae = VariationalAutoencoder(
+                            data_format=data_format,
+                            kernel_size=kernel_size,
+                            groups=groups,
+                            reduction=reduction,
+                            kernel_regularizer=kernel_regularizer,
+                            kernel_initializer=kernel_initializer,
+                            use_se=use_se,
+                            upsampling=upsampling,
+                            **kwargs)
 
     def call(self, inputs, training=False):
         """Returns the forward pass of the VolumetricCNN model.
         
             { Encoder -> [Decoder + Residuals, VAE] }
         """
-        enc_outs = self.encoder(inputs)
-        y_pred = self.decoder(enc_outs)
-        y_vae, z_mean, z_logvar = self.vae(enc_outs[-1])
+        enc_outs = self.encoder(inputs, training=training)
+        y_pred = self.decoder(enc_outs, training=training)
+        y_vae, z_mean, z_logvar = self.vae(enc_outs[-1], training=training)
 
         return (y_pred, y_vae, z_mean, z_logvar)
 
@@ -99,15 +126,33 @@ class EncDecCNN(tf.keras.models.Model):
         """
         super(EncDecCNN, self).__init__()
         self.epoch = tf.Variable(0, name='epoch', trainable=False)
-        self.encoder = ConvEncoder(**kwargs)
-        self.decoder = ConvDecoder(**kwargs)
+        self.encoder = ConvEncoder(
+                            data_format=data_format,
+                            kernel_size=kernel_size,
+                            groups=groups,
+                            reduction=reduction,
+                            kernel_regularizer=kernel_regularizer,
+                            kernel_initializer=kernel_initializer,
+                            use_se=use_se,
+                            downsampling=downsampling,
+                            **kwargs)
+        self.decoder = ConvDecoder(
+                            data_format=data_format,
+                            kernel_size=kernel_size,
+                            groups=groups,
+                            reduction=reduction,
+                            kernel_regularizer=kernel_regularizer,
+                            kernel_initializer=kernel_initializer,
+                            use_se=use_se,
+                            upsampling=upsampling,
+                            **kwargs)
 
     def call(self, inputs, training=False):
         """Returns the forward pass of the EncDecCNN model.
         
             { Encoder -> Decoder + Residuals }
         """
-        inputs = self.encoder(inputs)
-        inputs = self.decoder(inputs)
+        inputs = self.encoder(inputs, training=training)
+        inputs = self.decoder(inputs, training=training)
 
         return inputs

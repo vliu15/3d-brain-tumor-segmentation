@@ -106,9 +106,8 @@ class GroupNormalization(tf.keras.layers.Layer):
             self.beta = None
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=False, **kwargs):
         input_shape = list(inputs.shape)
-        input_shape[0] = tf.shape(inputs)[0]
 
         # Prepare broadcasting shape.
         reduction_axes = list(range(len(input_shape)))

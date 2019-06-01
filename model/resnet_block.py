@@ -22,7 +22,7 @@ class ConvLayer(tf.keras.layers.Layer):
                     The number of filters to use in the 3D convolutional
                     block. The output layer of this green block will have
                     this many number of channels.
-                kernel_size: kernel_size: (int, int, int), optional
+                kernel_size: kernel_size: int, optional
                     The size of all convolutional kernels. Defaults to 3,
                     as used in the paper.
                 data_format: str, optional
@@ -52,19 +52,22 @@ class ConvLayer(tf.keras.layers.Layer):
                             kernel_size=kernel_size,
                             strides=1,
                             padding='same',
-                            **kwargs)
+                            data_format=data_format,
+                            kernel_initializer=kernel_initializer,
+                            kernel_regularizer=kernel_regularizer)
         self.groupnorm = GroupNormalization(
                             groups=groups,
-                            axis=-1 if data_format == 'channels_last' else 1)
+                            axis=-1 if data_format == 'channels_last' else 1,
+                            **kwargs)
         self.relu = tf.keras.layers.Activation('relu')
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         """Returns the forward pass of the ConvLayer.
 
-            { GroupNormalization -> ReLU -> Conv3D }
+            { Conv3D -> GroupNorm -> ReLU }
         """
         inputs = self.conv3d(inputs)
-        inputs = self.groupnorm(inputs)
+        inputs = self.groupnorm(inputs, training=training)
         inputs = self.relu(inputs)
         return inputs
 
@@ -128,33 +131,49 @@ class ConvBlock(tf.keras.layers.Layer):
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
+                                data_format=data_format,
+                                kernel_initializer=kernel_initializer,
+                                kernel_regularizer=kernel_regularizer,
                                 **kwargs)
         self.use_se = use_se
         if self.use_se:
-            self.se_layer = SqueezeExcitation(**kwargs)
+            self.se_layer = SqueezeExcitation(
+                                reduction=reduction,
+                                data_format=data_format,
+                                **kwargs)
             self.scale = tf.keras.layers.Multiply()
         self.conv_layer1 = ConvLayer(
                                 filters=filters,
                                 kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_initializer=kernel_initializer,
+                                kernel_regularizer=kernel_regularizer,
                                 **kwargs)
         self.conv_layer2 = ConvLayer(
                                 filters=filters,
                                 kernel_size=kernel_size,
+                                groups=groups,
+                                reduction=reduction,
+                                data_format=data_format,
+                                kernel_initializer=kernel_initializer,
+                                kernel_regularizer=kernel_regularizer,
                                 **kwargs)
         self.residual = tf.keras.layers.Add()
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         """Returns the forward pass of the ConvBlock.
 
             { Conv3D_pointwise -> ConvLayer -> ConvLayer -> Residual }
         """
         if self.use_se:
             inputs = self.conv3d_ptwise(inputs)
-            res = self.scale([self.se_layer(inputs), inputs])
+            res = self.scale([self.se_layer(inputs, training=training), inputs])
         else:
             res = self.conv3d_ptwise(inputs)
-        inputs = self.conv_layer1(inputs)
-        inputs = self.conv_layer2(inputs)
+        inputs = self.conv_layer1(inputs, training=training)
+        inputs = self.conv_layer2(inputs, training=training)
         inputs = self.residual([res, inputs])
         return inputs
 

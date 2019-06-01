@@ -6,7 +6,8 @@ class SqueezeExcitation(tf.keras.layers.Layer):
                  reduction=2,
                  data_format='channels_last',
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer='he_normal'):
+                 kernel_initializer='he_normal',
+                 **kwargs):
         """Initializes one squeeze-excitation layer.
         
             See https://arxiv.org/pdf/1709.01507.pdf for details.
@@ -49,7 +50,7 @@ class SqueezeExcitation(tf.keras.layers.Layer):
                                                    kernel_initializer='glorot_normal',
                                                    activation='sigmoid')
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         """Returns the forward pass of one SqueezeExcitationLayer.
         
             { GlobalAveragePool -> Dense+ReLu -> Dense+Sigmoid }
