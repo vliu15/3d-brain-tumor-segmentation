@@ -4,7 +4,7 @@ import model.decoder
 import model.variational_autoencoder
 import model.volumetric_cnn
 
-from model.layers_utils import *
+from model.layer_utils import *
 
 
 __all__ = [model.resnet_block,
@@ -12,4 +12,4 @@ __all__ = [model.resnet_block,
            model.decoder,
            model.variational_autoencoder,
            model.volumetric_cnn,
-           model.layers]
+           model.layer_utils]
