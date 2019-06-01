@@ -1,8 +1,8 @@
 import tensorflow as tf
 
-from model.layers.group_norm import GroupNormalization
-from model.layers.upsample import ConvUpsample, LinearUpsample
-from model.layers.downsample import ConvDownsample, AvgDownsample, MaxDownsample
+from model.layer_utils.group_norm import GroupNormalization
+from model.layer_utils.upsample import ConvUpsample, LinearUpsample
+from model.layer_utils.downsample import ConvDownsample, AvgDownsample, MaxDownsample
 from model.resnet_block import ConvBlock, ConvLayer
 from utils.constants import *
 

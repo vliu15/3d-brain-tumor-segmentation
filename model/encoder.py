@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from model.resnet_block import ConvBlock, ConvLayer
-from model.layers.downsample import ConvDownsample, AvgDownsample, MaxDownsample
+from model.layer_utils.downsample import ConvDownsample, AvgDownsample, MaxDownsample
 from utils.constants import *
 
 
@@ -63,6 +63,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
+                            'downsampling': downsampling,
                             'use_se': use_se})
 
         # Retrieve downsampling method.

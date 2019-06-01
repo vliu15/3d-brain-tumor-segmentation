@@ -1,6 +1,6 @@
 import tensorflow as tf
-from model.layers.group_norm import GroupNormalization
-from model.layers.squeeze_excitation import SqueezeExcitation
+from model.layer_utils.group_norm import GroupNormalization
+from model.layer_utils.squeeze_excitation import SqueezeExcitation
 
 
 class ConvLayer(tf.keras.layers.Layer):
