@@ -83,6 +83,12 @@ def train_parser():
             help='Reduction ratio in excitation layers of SENet blocks.')
     parser.add_argument('--l2_scale', type=float, default=1e-5,
             help='Scale of L2-regularization for convolution kernel weights.')
+    parser.add_argument('--downsamp', type=str, default='max',
+            choices=['max', 'avg', 'conv'],
+            help='Method of downsampling.')
+    parser.add_argument('--upsamp', type=str, default='linear',
+            choices=['linear', 'conv'],
+            help='Method of upsampling.')
 
     args = parser.parse_args()
 

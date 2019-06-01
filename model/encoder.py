@@ -1,7 +1,17 @@
 import tensorflow as tf
 
-from model.resnet_block import ConvBlock
+from model.resnet_block import ConvBlock, ConvLayer
+from model.layers.downsample import ConvDownsample, AvgDownsample, MaxDownsample
 from utils.constants import *
+
+
+def get_downsampling(downsampling):
+    if downsampling == 'max':
+        return MaxDownsample
+    elif downsampling == 'avg':
+        return AvgDownsample
+    else:
+        return ConvDownsample
 
 
 class ConvEncoder(tf.keras.layers.Layer):
@@ -12,7 +22,9 @@ class ConvEncoder(tf.keras.layers.Layer):
                  reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False):
+                 use_se=False,
+                 downsampling='max',
+                 **kwargs):
         """Initializes the model encoder.
 
             See https://arxiv.org/pdf/1810.11654.pdf for more details.
@@ -53,79 +65,32 @@ class ConvEncoder(tf.keras.layers.Layer):
                             'kernel_initializer': kernel_initializer,
                             'use_se': use_se})
 
+        # Retrieve downsampling method.
+        Downsample = get_downsampling(downsampling)
+
         # Input layers.
-        self.inp_conv = tf.keras.layers.Conv3D(
+        self.inp_conv = ConvLayer(
                                 filters=ENC_CONV_LAYER_SIZE,
-                                kernel_size=kernel_size,
-                                strides=1,
-                                padding='same',
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
+                                **kwargs)
 
         # First ConvBlock: filters=32, x1.
-        self.conv_block_0 = [ConvBlock(filters=ENC_CONV_BLOCK0_SIZE,
-                                    kernel_size=kernel_size,
-                                    data_format=data_format,
-                                    groups=groups,
-                                    reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK0_NUM)]
-        self.conv_downsamp_0 = tf.keras.layers.Conv3D(
-                                    filters=ENC_CONV_BLOCK0_SIZE,
-                                    kernel_size=kernel_size,
-                                    strides=2,
-                                    padding='same',
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer)
+        self.conv_block_0 = [ConvBlock(filters=ENC_CONV_BLOCK0_SIZE, **kwargs)
+                                for _ in range(ENC_CONV_BLOCK0_NUM)]
+        self.conv_downsamp_0 = Downsample(**kwargs)
 
         # Second ConvBlock: filters=64, x2.
-        self.conv_block_1 = [ConvBlock(filters=ENC_CONV_BLOCK1_SIZE,
-                                    kernel_size=kernel_size,
-                                    data_format=data_format,
-                                    groups=groups,
-                                    reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK1_NUM)]
-        self.conv_downsamp_1 = tf.keras.layers.Conv3D(
-                                    filters=ENC_CONV_BLOCK1_SIZE,
-                                    kernel_size=kernel_size,
-                                    strides=2,
-                                    padding='same',
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer)
+        self.conv_block_1 = [ConvBlock(filters=ENC_CONV_BLOCK1_SIZE, **kwargs)
+                                for _ in range(ENC_CONV_BLOCK1_NUM)]
+        self.conv_downsamp_1 = Downsample(**kwargs)
 
         # Third ConvBlock: filters=128, x2.
-        self.conv_block_2 = [ConvBlock(filters=ENC_CONV_BLOCK2_SIZE,
-                                    kernel_size=kernel_size,
-                                    data_format=data_format,
-                                    groups=groups,
-                                    reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK2_NUM)]
-        self.conv_downsamp_2 = tf.keras.layers.Conv3D(
-                                    filters=ENC_CONV_BLOCK2_SIZE,
-                                    kernel_size=kernel_size,
-                                    strides=2,
-                                    padding='same',
-                                    data_format=data_format,
-                                    kernel_initializer=kernel_initializer,
-                                    kernel_regularizer=kernel_regularizer)
+        self.conv_block_2 = [ConvBlock(filters=ENC_CONV_BLOCK2_SIZE, **kwargs)
+                                for _ in range(ENC_CONV_BLOCK2_NUM)]
+        self.conv_downsamp_2 = Downsample(**kwargs)
 
         # Fourth ConvBlock: filters=256, x4.
-        self.conv_block_3 = [ConvBlock(filters=ENC_CONV_BLOCK3_SIZE,
-                                    kernel_size=kernel_size,
-                                    data_format=data_format,
-                                    groups=groups,
-                                    reduction=reduction,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    use_se=use_se) for _ in range(ENC_CONV_BLOCK3_NUM)]
+        self.conv_block_3 = [ConvBlock(filters=ENC_CONV_BLOCK3_SIZE, **kwargs)
+                                for _ in range(ENC_CONV_BLOCK3_NUM)]
 
     def call(self, inputs):
         """Returns the forward pass of the ConvEncoder.

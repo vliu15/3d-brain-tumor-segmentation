@@ -1,7 +1,15 @@
 import tensorflow as tf
 
 from model.resnet_block import ConvBlock
+from model.layers.upsample import ConvUpsample, LinearUpsample
 from utils.constants import *
+
+
+def get_upsampling(upsampling):
+    if upsampling == 'linear':
+        return LinearUpsample
+    else:
+        return ConvUpsample
 
 
 class DecoderBlock(tf.keras.layers.Layer):
@@ -13,7 +21,9 @@ class DecoderBlock(tf.keras.layers.Layer):
                  reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False):
+                 use_se=False,
+                 upsampling='linear',
+                 **kwargs):
         """Initializes one level of upsampling in the convolutional decoder.
 
             Each decoder block consists of a pointwise 3D-convolution followed
@@ -55,27 +65,21 @@ class DecoderBlock(tf.keras.layers.Layer):
                             'kernel_initializer': kernel_initializer,
                             'use_se': use_se})
 
+        # Retrieve upsampling method.
+        Upsample = get_upsampling(upsampling)
+
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
                                 filters=filters,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
-                                data_format=data_format,
-                                kernel_initializer=kernel_initializer,
-                                kernel_regularizer=kernel_regularizer)
-        self.upsample = tf.keras.layers.UpSampling3D(
-                                size=2,
-                                data_format=data_format)
+                                **kwargs)
+        self.upsample = Upsample(**kwargs)
         self.residual = tf.keras.layers.Add()
         self.conv_block = ConvBlock(
                                 filters=filters,
                                 kernel_size=kernel_size,
-                                data_format=data_format,
-                                groups=groups,
-                                reduction=reduction,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer = kernel_initializer,
-                                use_se=use_se)
+                                **kwargs)
 
     def call(self, inputs):
         """Returns the forward pass of one DecoderBlock.
@@ -101,7 +105,9 @@ class ConvDecoder(tf.keras.layers.Layer):
                  reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False):
+                 use_se=False,
+                 upsampling='linear',
+                 **kwargs):
         """Initializes the model decoder.
 
             See https://arxiv.org/pdf/1810.11654.pdf for more details.
@@ -142,50 +148,28 @@ class ConvDecoder(tf.keras.layers.Layer):
 
         self.dec_block_2 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK2_SIZE,
-                                kernel_size=kernel_size,
-                                data_format=data_format,
-                                groups=groups,
-                                reduction=reduction,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                use_se=use_se)
+                                **kwargs)
         self.dec_block_1 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK1_SIZE,
-                                kernel_size=kernel_size,
-                                data_format=data_format,
-                                groups=groups,
-                                reduction=reduction,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                use_se=use_se)
+                                **kwargs)
         self.dec_block_0 = DecoderBlock(
                                 filters=DEC_CONV_BLOCK0_SIZE,
-                                kernel_size=kernel_size,
-                                data_format=data_format,
-                                groups=groups,
-                                reduction=reduction,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                use_se=use_se)
+                                **kwargs)
 
         self.conv_out = tf.keras.layers.Conv3D(
                                 filters=DEC_CONV_LAYER_SIZE,
                                 kernel_size=kernel_size,
                                 strides=1,
                                 padding='same',
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
+                                **kwargs)
 
         self.ptwise_logits = tf.keras.layers.Conv3D(
                                 filters=OUT_CH-1,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer='glorot_normal',
-                                activation='sigmoid')
+                                activation='sigmoid',
+                                **kwargs)
 
     def call(self, inputs):
         """Returns the forward pass of the ConvDecoder.

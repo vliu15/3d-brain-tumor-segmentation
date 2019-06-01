@@ -28,7 +28,9 @@ def custom_train(args):
                     reduction=args.se_reduction,
                     use_se=args.use_se,
                     kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
-                    kernel_initializer='he_normal')
+                    kernel_initializer='he_normal',
+                    downsampling=args.downsamp,
+                    upsampling=args.upsamp)
 
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
@@ -120,7 +122,7 @@ def custom_train(args):
                                      v=train_accu.result(),
                                      p=train_prec.result(),
                                      r=train_reca.result(),
-                                     d=train_dice.result()))
+                                     d=train_dice.result()), flush=True)
 
         print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
                Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
@@ -128,7 +130,7 @@ def custom_train(args):
                                v=train_accu.result(),
                                p=train_prec.result(),
                                r=train_reca.result(),
-                               d=train_dice.result()))
+                               d=train_dice.result()), flush=True)
 
         # Validation epoch.
         for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
@@ -150,7 +152,7 @@ def custom_train(args):
                                v=val_accu.result(),
                                p=val_prec.result(),
                                r=val_reca.result(),
-                               d=val_dice.result()))
+                               d=val_dice.result()), flush=True)
 
         # Write logs.
         if args.log_file:

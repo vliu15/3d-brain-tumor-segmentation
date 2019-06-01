@@ -1,6 +1,6 @@
 import tensorflow as tf
-from model.group_norm import GroupNormalization
-from model.squeeze_excitation import SqueezeExcitation
+from model.layers.group_norm import GroupNormalization
+from model.layers.squeeze_excitation import SqueezeExcitation
 
 
 class ConvLayer(tf.keras.layers.Layer):
@@ -10,7 +10,8 @@ class ConvLayer(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer='he_normal'):
+                 kernel_initializer='he_normal',
+                 **kwargs):
         """Initializes one convolutional layer.
 
             Each convolutional layer is comprised of a group normalization,
@@ -46,27 +47,25 @@ class ConvLayer(tf.keras.layers.Layer):
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer})
 
-        self.groupnorm = GroupNormalization(
-                            groups=groups,
-                            axis=-1 if data_format == 'channels_last' else 1)
-        self.relu = tf.keras.layers.Activation('relu')
         self.conv3d = tf.keras.layers.Conv3D(
                             filters=filters,
                             kernel_size=kernel_size,
                             strides=1,
                             padding='same',
-                            data_format=data_format,
-                            kernel_regularizer=kernel_regularizer,
-                            kernel_initializer=kernel_initializer)
+                            **kwargs)
+        self.groupnorm = GroupNormalization(
+                            groups=groups,
+                            axis=-1 if data_format == 'channels_last' else 1)
+        self.relu = tf.keras.layers.Activation('relu')
 
     def call(self, inputs):
         """Returns the forward pass of the ConvLayer.
 
             { GroupNormalization -> ReLU -> Conv3D }
         """
+        inputs = self.conv3d(inputs)
         inputs = self.groupnorm(inputs)
         inputs = self.relu(inputs)
-        inputs = self.conv3d(inputs)
         return inputs
 
     def get_config(self):
@@ -82,7 +81,8 @@ class ConvBlock(tf.keras.layers.Layer):
                  reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False):
+                 use_se=False,
+                 **kwargs):
         """Initializes one convolutional block.
 
             A convolutional block (green block in the paper) consists of a pointwise
@@ -128,31 +128,19 @@ class ConvBlock(tf.keras.layers.Layer):
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
+                                **kwargs)
         self.use_se = use_se
         if self.use_se:
-            self.se_layer = SqueezeExcitation(
-                                    reduction=reduction,
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer)
+            self.se_layer = SqueezeExcitation(**kwargs)
             self.scale = tf.keras.layers.Multiply()
         self.conv_layer1 = ConvLayer(
                                 filters=filters,
                                 kernel_size=kernel_size,
-                                data_format=data_format,
-                                groups=groups,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
+                                **kwargs)
         self.conv_layer2 = ConvLayer(
                                 filters=filters,
                                 kernel_size=kernel_size,
-                                data_format=data_format,
-                                groups=groups,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
+                                **kwargs)
         self.residual = tf.keras.layers.Add()
 
     def call(self, inputs):

@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from model.group_norm import GroupNormalization
+from model.layers.group_norm import GroupNormalization
 from model.resnet_block import ConvBlock
 from utils.constants import *
 
