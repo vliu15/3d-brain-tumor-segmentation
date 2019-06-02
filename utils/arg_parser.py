@@ -125,7 +125,7 @@ def test_parser():
     # Data.
     parser.add_argument('--test_folder', type=str, required=True,
             help='Location of test set data.')
-    parser.add_arrgument('--data_format', type=str, default='channels_last',
+    parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')
 
@@ -140,6 +140,7 @@ def test_parser():
 
     args = parser.parse_args()
 
+    args.device = '/device:GPU:0' if args.gpu else '/cpu:0'
     if not args.gpu:
         assert args.data_format == 'channels_last', \
             'tf.keras.layers.Conv3D only supports `channels_last` input for CPU.'
