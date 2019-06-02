@@ -6,6 +6,8 @@ We adopt the encoder-decoder convolutional architecture described in the [above 
  - Added squeeze-excitation layers (SENet) in the ResNet blocks, as they have been shown to improve performance.
  - Reordered all convolutional layers to consist of `Conv3D`, `GroupNorm`, `ReLU`, except for all pointwise and output layers.
  - Replaced strided convolutions in downsampling with max pooling.
+ - Use He normal initialization for *all* layer kernels except those with sigmoid activations, which we use Glorot normal initialization for.
+ - Add per-epoch learning rate linear warmup from a base learning rate of `1e-6` for the first 10 epochs.
 
 > Use the `--use_se` flag to add squeeze-excitation layers to the model during training.
 
@@ -44,7 +46,7 @@ python preprocess.py --brats_folder data/BraTS17TrainingData --create_val
 ### Training
 As per the paper, we adopt all hyperparameters used in training (as default arguments). We will provide our training logs and graphs here shortly. See `scripts/train.sh` for a detailed example of how to run training. The size of the model can be adjusted in `utils/constants.py`.
 ```
-python3\ train.py --train_loc data/train.tfrecords --val_loc data/val.tfrecords
+python3\ train.py --train_loc data/train.image_wise.tfrecords --val_loc data/val.image_wise.tfrecords
 ```
 
 > Use the `--gpu` flag to run on GPU.
@@ -55,3 +57,6 @@ The testing script `test.py` run inference on unlabeled data provided as input b
 python test.py --test_folder /path/to/test/data --prepro_file data/image_mean_std.npy --chkpt_file chkpt.hdf5
 ```
 *You must specify the same model parameters as the ones use in training for the trained weights to be successfully loaded.*
+
+### Results
+We run training on a V100 32GB GPU. Each epoch consist of around 1400 examples after data augmentation and takes around 75 minutes to run.
