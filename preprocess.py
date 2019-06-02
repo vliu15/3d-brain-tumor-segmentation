@@ -171,19 +171,18 @@ def main(args):
     if args.norm == 'image':
         print('Apply image-wise normalization per channel.')
         voxel_mean, voxel_std = image_norm(X_train, data_format=args.data_format)
-        np.save(os.path.join(args.out_folder, 'image_mean_std.npy'),
-                {'mean': voxel_mean, 'std': voxel_std})
     elif args.norm == 'pixel':
         print('Apply pixel-wise normalization per channel.')
         voxel_mean, voxel_std = pixel_norm(X_train, data_format=args.data_format)
-        np.save(os.path.join(args.out_folder, 'pixel_mean_std.npy'),
-                {'mean': voxel_mean, 'std': voxel_std})
+
+    np.save(os.path.join(args.out_folder, '{}_mean_std.npy'.format(args.norm)),
+            {'mean': voxel_mean, 'std': voxel_std})
 
     X_train = normalize(voxel_mean, voxel_std, X_train)
     if args.create_val:
         X_val = normalize(voxel_mean, voxel_std, X_val)
 
-        writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'val.tfrecords'))
+        writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'val.{}_wise.tfrecords'.format(args.norm)))
         for X, y in tqdm(zip(X_val, y_val)):
             for _ in range(args.n_crops):
                 X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
@@ -193,7 +192,7 @@ def main(args):
 
     # Randomly flip for data augmentation.
     print('Randomly augment training data, crop, and save.')
-    writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'train.tfrecords'))
+    writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'train.{}_wise.tfrecords'.format(args.norm)))
 
     for X, y in tqdm(zip(X_train, y_train)):
         # Augment.
