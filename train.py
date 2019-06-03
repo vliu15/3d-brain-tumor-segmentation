@@ -15,9 +15,9 @@ from model.volumetric_cnn import VolumetricCNN
 def custom_train(args):
     # Load data.
     train_data, n_train = prepare_dataset(
-                            args.train_loc, args.batch_size, buffer_size=100, data_format=args.data_format)
+                            args.train_loc, args.batch_size, buffer_size=100, data_format=args.data_format, repeat=False)
     val_data, n_val = prepare_dataset(
-                            args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format)
+                            args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format, repeat=False)
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
 
@@ -203,9 +203,9 @@ def custom_train(args):
 def keras_train(args):
     # Load data.
     train_data, n_train = prepare_dataset(
-                            args.train_loc, args.batch_size, buffer_size=100, data_format=args.data_format)
+                            args.train_loc, args.batch_size, buffer_size=100, data_format=args.data_format, repeat=True)
     val_data, n_val = prepare_dataset(
-                            args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format)
+                            args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format, repeat=True)
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
 
@@ -213,17 +213,16 @@ def keras_train(args):
         if args.load_file:
             model = tf.keras.models.load_model(args.load_file)
         else:
-            model = VolumetricCNN(
-                            data_format=args.data_format,
-                            kernel_size=args.conv_kernel_size,
-                            groups=args.gn_groups,
-                            reduction=args.se_reduction,
-                            use_se=args.use_se,
-                            kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
-                            kernel_initializer=args.kernel_init,
-                            downsampling=args.downsamp,
-                            upsampling=args.upsamp,
-                            normalization=args.norm)
+            model = VolumetricCNN(data_format=args.data_format,
+                                  kernel_size=args.conv_kernel_size,
+                                  groups=args.gn_groups,
+                                  reduction=args.se_reduction,
+                                  use_se=args.use_se,
+                                  kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
+                                  kernel_initializer=args.kernel_init,
+                                  downsampling=args.downsamp,
+                                  upsampling=args.upsamp,
+                                  normalization=args.norm)
 
         model.compile(optimizer=tf.keras.optimizers.Adam(
                                     learning_rate=args.lr,

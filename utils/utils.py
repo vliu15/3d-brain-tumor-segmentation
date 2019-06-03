@@ -5,7 +5,7 @@ import numpy as np
 from utils.constants import *
 
 
-def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_last'):
+def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_last', repeat=False):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
         """Mapping function to parse a single example."""
@@ -40,7 +40,13 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
     dataset = tf.data.TFRecordDataset(path)
     dataset_len = get_dataset_len(dataset)
 
-    dataset = (dataset.map(parse_example)
+    if repeat:
+        dataset = (dataset.map(parse_example)
+                      .repeat()
+                      .shuffle(buffer_size)
+                      .batch(batch_size))
+    else:
+        dataset = (dataset.map(parse_example)
                       .shuffle(buffer_size)
                       .batch(batch_size))
 
