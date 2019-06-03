@@ -213,14 +213,17 @@ def keras_train(args):
         if args.load_file:
             model = tf.keras.models.load_model(args.load_file)
         else:
-            model = EncDecCNN(
-                        data_format=args.data_format,
-                        kernel_size=args.conv_kernel_size,
-                        groups=args.gn_groups,
-                        reduction=args.se_reduction,
-                        kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
-                        kernel_initializer='he_normal',
-                        use_se=args.use_se)
+            model = VolumetricCNN(
+                            data_format=args.data_format,
+                            kernel_size=args.conv_kernel_size,
+                            groups=args.gn_groups,
+                            reduction=args.se_reduction,
+                            use_se=args.use_se,
+                            kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
+                            kernel_initializer=args.kernel_init,
+                            downsampling=args.downsamp,
+                            upsampling=args.upsamp,
+                            normalization=args.norm)
 
         model.compile(optimizer=tf.keras.optimizers.Adam(
                                     learning_rate=args.lr,
@@ -232,8 +235,7 @@ def keras_train(args):
                       metrics=[tf.keras.metrics.Accuracy(),
                                tf.keras.metrics.Precision(),
                                tf.keras.metrics.Recall(),
-                               DiceCoefficient(data_format=args.data_format),
-                               HausdorffDistance()])
+                               DiceCoefficient(data_format=args.data_format)])
 
         history = model.fit(train_data,
                             epochs=args.n_epochs,
@@ -246,7 +248,7 @@ def keras_train(args):
                                             save_weights_only=False),
                                        tf.keras.callbacks.EarlyStopping(
                                             monitor='val_loss',
-                                            min_delta=1e-2,
+                                            min_delta=1e-3,
                                             patience=args.patience),
                                        tf.keras.callbacks.CSVLogger(
                                             args.log_file)],

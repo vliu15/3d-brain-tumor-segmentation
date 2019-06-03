@@ -29,20 +29,26 @@ class ScheduledAdam(tf.keras.optimizers.Adam):
         self.n_epochs = float(n_epochs)
         self.warmup_size = (learning_rate - BASE_LR) / warmup_epochs
 
-    def __call__(self, epoch_num):
+    def __call__(self, epoch):
         """Allows external manual scheduling per epoch."""
         new_lr = tf.minimum(
-                    self.init_lr * ((1.0 - epoch_num / self.n_epochs) ** 0.9),
-                    BASE_LR + epoch_num * self.warmup_size )
+                    self.init_lr * ((1.0 - epoch / self.n_epochs) ** 0.9),
+                    BASE_LR + epoch * self.warmup_size)
         self._set_hyper('learning_rate', new_lr)
 
 
 class Scheduler(object):
     """Scheduler compatible with tf.keras.callbacks.LearningRateScheduler."""
-    def __init__(self, total_epochs, init_lr):
-        self.total_epochs = total_epochs
-        self.init_lr = init_lr
+    def __init__(self,
+                 n_epochs=300,
+                 learning_rate=1e-4,
+                 warmup_epochs=10):
+        self.n_epochs = n_epochs
+        self.init_lr = learning_rate
+        self.warmup_size = (learning_rate - BASE_LR) / warmup_epochs
 
     def __call__(self, epoch, lr):
         """Function automatically called after initialization."""
-        return self.init_lr * ((1.0 - epoch / self.total_epochs) ** 0.9)
+        return tf.minimum(
+                    self.init_lr * ((1.0 - epoch / self.n_epochs) ** 0.9),
+                    BASE_LR + epoch * self.warmup_size)

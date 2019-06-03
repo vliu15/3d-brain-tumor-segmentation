@@ -24,7 +24,7 @@ def add_model_args(parser):
             help='Whether to use SENet blocks instead of ResNet blocks.')
     parser.add_argument('--se_reduction', type=int, default=2,
             help='Reduction ratio in excitation layers of SENet blocks.')
-    parser.add_argument('--l2_scale', type=float, default=1e-5,
+    parser.add_argument('--l2_scale', type=float, default=1e-4,
             help='Scale of L2-regularization for convolution kernel weights.')
     parser.add_argument('--kernel_init', type=str, default='he_normal',
             choices=['he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform'],
@@ -95,7 +95,7 @@ def train_parser():
     # Optimization.
     parser.add_argument('--n_epochs', type=int, default=300,
             help='Total number of epochs to train for.')
-    parser.add_argument('--lr', type=float, default=1e-5,
+    parser.add_argument('--lr', type=float, default=1e-4,
             help='Initial learning rate of Adam optimizer.')
     parser.add_argument('--warmup_epochs', type=int, default=10,
             help='Number of epochs for learning rate warmup.')
