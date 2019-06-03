@@ -97,7 +97,7 @@ def custom_train(args):
         model.epoch.assign(epoch)
 
         # Schedule learning rate.
-        optimizer(epoch_num=epoch)
+        optimizer(epoch=epoch)
 
         # Training epoch.
         for step, (X, y) in tqdm(enumerate(train_data, 1), total=n_train, desc='Training      '):
@@ -239,7 +239,7 @@ def keras_train(args):
         history = model.fit(train_data,
                             epochs=args.n_epochs,
                             callbacks=[tf.keras.callbacks.LearningRateScheduler(
-                                            Scheduler(args.n_epochs, args.lr)),
+                                            Scheduler(args.n_epochs, args.lr, args.warmup_epochs)),
                                        tf.keras.callbacks.ModelCheckpoint(
                                             args.save_file,
                                             monitor='val_loss',
