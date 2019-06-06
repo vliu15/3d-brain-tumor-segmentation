@@ -18,10 +18,10 @@ D        =  128                     # Target depth of preprocessed image.
 IN_CH    =  len(BRATS_MODALITIES)   # Number of input channels.
 OUT_CH   =  len(LABELS)             # Number of output channels.
 
-CHANNELS_FIRST_X_SHAPE     =   (IN_CH, H, W, D)
-CHANNELS_FIRST_Y_SHAPE     =   (1, H, W, D)
-CHANNELS_LAST_X_SHAPE      =   (H, W, D, IN_CH)
-CHANNELS_LAST_Y_SHAPE      =   (H, W, D, 1)
+CHANNELS_FIRST_X_SHAPE     =   (IN_CH, RAW_H, RAW_W, RAW_D)
+CHANNELS_FIRST_Y_SHAPE     =   (1, RAW_H, RAW_W, RAW_D)
+CHANNELS_LAST_X_SHAPE      =   (RAW_H, RAW_W, RAW_D, IN_CH)
+CHANNELS_LAST_Y_SHAPE      =   (RAW_H, RAW_W, RAW_D, 1)
 
 
 # Encoder.

@@ -5,10 +5,45 @@ import numpy as np
 from utils.constants import *
 
 
+def prepare_example(X, y, prob=0.5, data_format='channels_last'):
+    """Performs augmentation and cropping in training."""
+    # Data augmentation.
+    if np.random.uniform() < prob:
+        axes = (1, 2, 3) if data_format == 'chanenls_last' else (2, 3, 4)
+        X = tf.reverse(X, axis=axes)
+        y = tf.reverse(y, axis=axes)
+
+    # Sample corner points.
+    h = np.random.randint(H, RAW_H)
+    w = np.random.randint(W, RAW_W)
+    d = np.random.randint(D, RAW_D)
+
+    if data_format == 'channels_last':
+        X = X[h-H:h, w-W:w, d-D:d, :]
+        y = y[h-H:h, w-W:w, d-D:d, :]
+    else:
+        X = X[:, h-H:h, w-W:w, d-D:d]
+        y = y[:, h-H:h, w-W:w, d-D:d]
+        
+    return X, y
+
+
+def prepare_val_set(dataset, n_sets=2, prob=0.5, data_format='channels_last'):
+    """Prepares validation sets (with cropping and flipping)."""
+    def parse_example(example):
+        return tf.stack([prepare_example(X, y, prob=prob, data_format=data_format)
+                         for (X, y) in example], axis=0)
+    
+    for i in range(n_sets):
+        if i == 0: val_set = dataset.map(parse_example)
+        else: val_set = val_set.concatenate(dataset.map(parse_example))
+
+    return val_set
+
+
 def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_last', repeat=False):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
-        """Mapping function to parse a single example."""
         parsed = tf.io.parse_single_example(example_proto, example_desc)
         if data_format == 'channels_last':
             X = tf.reshape(parsed['X'], CHANNELS_LAST_X_SHAPE)
@@ -33,8 +68,8 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
         return sum(1 for _ in tf_dataset)
 
     example_desc = {
-        'X': tf.io.FixedLenFeature([H * W * D * IN_CH], tf.float32),
-        'y': tf.io.FixedLenFeature([H * W * D * 1], tf.float32)
+        'X': tf.io.FixedLenFeature([RAW_H * RAW_W * RAW_D * IN_CH], tf.float32),
+        'y': tf.io.FixedLenFeature([RAW_H * RAW_W * RAW_D * 1], tf.float32)
     }
 
     dataset = tf.data.TFRecordDataset(path)

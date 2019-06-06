@@ -20,21 +20,7 @@ def get_npy_image(subject_folder, name):
 
 
 def create_dataset(brats_folder, data_format='channels_last'):
-    """Returns lists of data inputs and labels.
-
-        Args:
-            brats_folder: path to the BraTS unprocessed data folder.
-            data_format: format of the target preprocessed data, either
-                `channels_first` or `channels_last`.
-
-        Returns:
-            X: a list of examples, of shapes
-                if data_format == 'channels_first': shape=(4, 240, 240, 155)
-                if data_format == 'channels_last': shape=(240, 240, 155, 4)
-            y: a list of corresponding labels, of shapes
-                if data_format == 'channels_first': shape=(1, 240, 240, 155)
-                if data_format == 'channels_last': shape=(240, 240, 155, 1)
-    """
+    """Returns lists of data inputs and labels."""
     X = []
     y = []
     # Loop through each folder with `.nii.gz` files.
@@ -59,6 +45,7 @@ def create_dataset(brats_folder, data_format='channels_last'):
 
 
 def create_splits(X, y):
+    """Creates 10:1 train:val split."""
     data = list(zip(X, y))
     random.shuffle(data)
     X, y = list(zip(*data))
@@ -73,7 +60,7 @@ def create_splits(X, y):
 
 
 def image_norm(X_train, data_format='channels_last'):
-    """Returns mean and standard deviation per channel for training inputs."""
+    """Returns image-wise mean and standard deviation per channel."""
     transpose_order = (4, 0, 1, 2, 3) if data_format == 'channels_last' else (1, 0, 2, 3, 4)
     X_train = X_train.transpose(*transpose_order).reshape(IN_CH, -1)
 
@@ -95,6 +82,7 @@ def image_norm(X_train, data_format='channels_last'):
 
 
 def pixel_norm(X_train, data_format='channels_last'):
+    """Returns pixel-wise mean and standard deviation per channel."""
     # Compute mean and std for each position.
     voxel_mean = np.zeros_like(X_train[0])
     voxel_std = np.zeros_like(X_train[0])
@@ -131,23 +119,6 @@ def example_to_tfrecords(X, y, writer):
     writer.write(example.SerializeToString())
 
 
-def sample_crop(X, y, data_format='channels_last'):
-    """Returns the crop of one (X, y) example."""
-    # Sample corner points.
-    h = np.random.randint(H, RAW_H)
-    w = np.random.randint(W, RAW_W)
-    d = np.random.randint(D, RAW_D)
-
-    if data_format == 'channels_last':
-        X = X[h-H:h, w-W:w, d-D:d, :]
-        y = y[h-H:h, w-W:w, d-D:d, :]
-    else:
-        X = X[:, h-H:h, w-W:w, d-D:d]
-        y = y[:, h-H:h, w-W:w, d-D:d]
-        
-    return X, y
-
-
 def main(args):
     # Convert .nii.gz data files to a list Tensors.
     print('Convert data to Numpy arrays.')
@@ -178,38 +149,19 @@ def main(args):
     np.save(os.path.join(args.out_folder, '{}_mean_std.npy'.format(args.norm)),
             {'mean': voxel_mean, 'std': voxel_std})
 
+    # Save normalized training data.
     X_train = normalize(voxel_mean, voxel_std, X_train)
+    writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'train.{}_wise.tfrecords'.format(args.norm)))
+    for X, y in tqdm(zip(X_train, y_train)):
+        example_to_tfrecords(X, y, writer)
+
+    # Save normalized validation data.
     if args.create_val:
         X_val = normalize(voxel_mean, voxel_std, X_val)
 
         writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'val.{}_wise.tfrecords'.format(args.norm)))
         for X, y in tqdm(zip(X_val, y_val)):
-            for _ in range(args.n_crops):
-                X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
-                example_to_tfrecords(X_crop, y_crop, writer)
-        del X_val
-        del y_val
-
-    # Randomly flip for data augmentation.
-    print('Randomly augment training data, crop, and save.')
-    writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'train.{}_wise.tfrecords'.format(args.norm)))
-
-    for X, y in tqdm(zip(X_train, y_train)):
-        # Augment.
-        if np.random.uniform() < args.mirror_prob:
-            axis = (1, 2, 3) if args.data_format == 'channels_last' else (2, 3, 4)
-            X_augment = np.flip(X, axis=axis)
-            y_augment = np.flip(y, axis=axis)
-
-            # Write augmented crops to TFRecord.
-            for _ in range(args.n_crops):
-                X_crop, y_crop = sample_crop(X_augment, y_augment, data_format=args.data_format)
-                example_to_tfrecords(X_crop, y_crop, writer)
-
-        # Write original crop to TFRecord.
-        for _ in range(args.n_crops):
-            X_crop, y_crop = sample_crop(X, y, data_format=args.data_format)
-            example_to_tfrecords(X_crop, y_crop, writer)
+            example_to_tfrecords(X, y, writer)
 
 
 if __name__ == '__main__':

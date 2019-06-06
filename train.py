@@ -8,16 +8,18 @@ from utils.losses import DiceLoss, CustomLoss
 from utils.metrics import DiceCoefficient
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
-from utils.utils import prepare_dataset
+from utils.utils import prepare_example, prepare_example, prepare_val_set
 from model.volumetric_cnn import VolumetricCNN
 
 
 def custom_train(args):
     # Load data.
-    train_data, n_train = prepare_dataset(
-                            args.train_loc, args.batch_size, buffer_size=100, data_format=args.data_format, repeat=False)
-    val_data, n_val = prepare_dataset(
-                            args.val_loc, args.batch_size, buffer_size=50, data_format=args.data_format, repeat=False)
+    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size,
+                                          buffer_size=100, data_format=args.data_format, repeat=False)
+    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
+                                      buffer_size=50, data_format=args.data_format, repeat=False)
+    val_data = prepare_val_sets(val_data, n_sets=args.n_val_sets,
+                                prob=args.mirror_prob, data_format=args.data_format)
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
 
@@ -50,7 +52,6 @@ def custom_train(args):
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss and metrics.
-    # loss_fn = DiceLoss(data_format=args.data_format)
     loss_fn = CustomLoss(data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -92,15 +93,12 @@ def custom_train(args):
     # Train.
     for epoch in range(start_epoch, args.n_epochs):
         print('Epoch {}.'.format(epoch))
-
-        # Track epoch in model.
-        model.epoch.assign(epoch)
-
-        # Schedule learning rate.
-        optimizer(epoch=epoch)
+        model.epoch.assign(epoch)           # Track epoch in model.
+        optimizer(epoch=epoch)              # Schedule learning rate.
 
         # Training epoch.
         for step, (X, y) in tqdm(enumerate(train_data, 1), total=n_train, desc='Training      '):
+            X, y = prepare_example(X, y, prob=args.mirror_prob, data_format=args.data_format)
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
                     # Forward and loss.
@@ -111,6 +109,7 @@ def custom_train(args):
                 # Gradients and backward.
                 grads = tape.gradient(loss, model.trainable_variables)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
                 train_loss.update_state(loss)
                 train_accu.update_state(y, y_pred)
                 train_prec.update_state(y, y_pred)

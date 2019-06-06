@@ -50,10 +50,6 @@ def prepro_parser():
     parser.add_argument('--norm', type=str, default='image',
             choices=['image', 'pixel'],
             help='Type of normalization to apply.')
-    parser.add_argument('--mirror_prob', type=float, default=0.75,
-            help='Probability that each inputs are flipped across all 3 axes.')
-    parser.add_argument('--n_crops', type=int, default=3,
-            help='Number of random crops to sample per image.')
 
     args = parser.parse_args()
 
@@ -78,6 +74,10 @@ def train_parser():
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')
+    parser.add_argument('--mirror_prob', type=float, default=0.5,
+            help='Probability that each inputs are flipped across all 3 axes.')
+    parser.add_argument('--n_val_sets', type=int, default=2,
+            help='Number of unique validation sets.')
 
     # Training.
     parser.add_argument('--log_file', type=str, default='train.log',
