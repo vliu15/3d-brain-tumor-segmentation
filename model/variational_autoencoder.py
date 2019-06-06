@@ -191,7 +191,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer,
                                     kernel_initializer=kernel_initializer)
         self.relu_VU = tf.keras.layers.Activation('relu')
-        self.reshape_VU = tf.keras.layers.Reshape((h, w, d, 1))
+        self.reshape_VU = tf.keras.layers.Reshape((h, w, d, 1) if data_format == 'channels_last' else (1, h, w, d))
         self.conv1d_VU = tf.keras.layers.Conv3D(
                                     filters=VAE_VU_BLOCK_SIZE,
                                     kernel_size=1,

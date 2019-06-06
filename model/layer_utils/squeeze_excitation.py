@@ -58,6 +58,10 @@ class SqueezeExcitation(tf.keras.layers.Layer):
         inputs = self.global_pool(inputs)
         inputs = self.dense_relu(inputs)
         inputs = self.dense_sigmoid(inputs)
+        if self.data_format == 'channels_last':
+            inputs = tf.reshape(inputs, shape=(1, 1, 1, 1, -1))
+        else:
+            inputs = tf.reshape(inputs, shape=(1, -1, 1, 1, 1))
         return inputs
 
     def get_config(self):

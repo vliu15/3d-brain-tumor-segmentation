@@ -67,7 +67,7 @@ def image_norm(X_train, data_format='channels_last'):
     # Compute mean and std for each channel.
     voxel_mean = np.zeros(IN_CH)
     voxel_std = np.zeros(IN_CH)
-    for i, channel in tqdm(enumerate(X_train), leave=False):
+    for i, channel in tqdm(enumerate(X_train)):
         voxel_mean[i] = np.mean(channel[channel != 0])
         voxel_std[i] = np.std(channel[channel != 0])
 
@@ -150,6 +150,7 @@ def main(args):
             {'mean': voxel_mean, 'std': voxel_std})
 
     # Save normalized training data.
+    print('Save training set.')
     X_train = normalize(voxel_mean, voxel_std, X_train)
     writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'train.{}_wise.tfrecords'.format(args.norm)))
     for X, y in tqdm(zip(X_train, y_train)):
@@ -157,8 +158,8 @@ def main(args):
 
     # Save normalized validation data.
     if args.create_val:
+        print('Save validation data.')
         X_val = normalize(voxel_mean, voxel_std, X_val)
-
         writer = tf.io.TFRecordWriter(os.path.join(args.out_folder, 'val.{}_wise.tfrecords'.format(args.norm)))
         for X, y in tqdm(zip(X_val, y_val)):
             example_to_tfrecords(X, y, writer)

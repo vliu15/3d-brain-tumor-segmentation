@@ -8,7 +8,7 @@ from utils.losses import DiceLoss, CustomLoss
 from utils.metrics import DiceCoefficient
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
-from utils.utils import prepare_example, prepare_example, prepare_val_set
+from utils.utils import prepare_dataset, prepare_batch, prepare_val_set
 from model.volumetric_cnn import VolumetricCNN
 
 
@@ -18,7 +18,7 @@ def custom_train(args):
                                           buffer_size=100, data_format=args.data_format, repeat=False)
     val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
                                       buffer_size=50, data_format=args.data_format, repeat=False)
-    val_data = prepare_val_sets(val_data, n_sets=args.n_val_sets,
+    val_data = prepare_val_set(val_data, n_sets=args.n_val_sets,
                                 prob=args.mirror_prob, data_format=args.data_format)
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
@@ -37,8 +37,8 @@ def custom_train(args):
                     normalization=args.norm)
 
     # Build model with initial forward pass.
-    _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
-                                    else [1] + list(CHANNELS_FIRST_X_SHAPE)))
+    _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
+                                    else (1, IN_CH, H, W, D)))
 
     # Get starting epoch.
     start_epoch = model.epoch.value().numpy()
@@ -98,7 +98,7 @@ def custom_train(args):
 
         # Training epoch.
         for step, (X, y) in tqdm(enumerate(train_data, 1), total=n_train, desc='Training      '):
-            X, y = prepare_example(X, y, prob=args.mirror_prob, data_format=args.data_format)
+            X, y = prepare_batch(X, y, prob=args.mirror_prob, data_format=args.data_format)
             with tf.device(args.device):
                 with tf.GradientTape() as tape:
                     # Forward and loss.

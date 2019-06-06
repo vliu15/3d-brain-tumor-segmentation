@@ -13,7 +13,10 @@ from model.volumetric_cnn import VolumetricCNN
 
 def get_npy_image(subject_folder, name):
     """Returns np.array from .nii files."""
-    file_card = glob.glob(os.path.join(subject_folder, '*' + name + '_proc.nii'))[0]
+    try:
+        file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii' + '*'))[0]
+    except:
+        file_card = glob.glob(os.path.join(subject_folder, '*' + name + '_proc.nii'))[0]
     return np.array(nib.load(file_card).dataobj).astype(np.float32)
 
 
@@ -109,7 +112,7 @@ def create_mask(y, data_format):
     mask = tf.cast(mask > 0.5, tf.int32)
 
     # Take the argmax to determine label.
-    seg_mask = tf.argmax(d1, output_type=tf.int32)
+    seg_mask = tf.argmax(d1, axis=axis, output_type=tf.int32)
 
     # Convert [0, 1, 2] to [1, 2, 3] for consistency.
     seg_mask += 1
@@ -140,8 +143,8 @@ def main(args):
                         normalization=args.norm)
 
     # Build model with initial forward pass.
-    _ = model(tf.zeros(shape=[1] + list(CHANNELS_LAST_X_SHAPE) if args.data_format == 'channels_last'
-                                    else [1] + list(CHANNELS_FIRST_X_SHAPE)))
+    _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
+                                    else (1, IN_CH, H, W, D)))
     # Load weights.
     model.load_weights(args.chkpt_file)
 
@@ -151,12 +154,11 @@ def main(args):
         # Extract raw images from each.
         if args.data_format == 'channels_last':
             X = np.stack(
-                [get_npy_image(subject_folder, name) for name in RTOG_MODALITIES], axis=-1)
-            print(X.shape)
+                [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=-1)
         elif args.data_format == 'channels_first':
             X = np.stack(
-                [get_npy_image(subject_folder, name) for name in RTOG_MODALITIES], axis=0)
-        continue
+                [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=0)
+
         # Prepare input image.
         X = prepare_image(X, voxel_mean, voxel_std, args.data_format)
 
