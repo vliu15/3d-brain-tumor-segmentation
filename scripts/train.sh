@@ -3,7 +3,7 @@
 python train.py \
     --train_loc /share/pi/hackhack/preprocessed/train.image_wise.tfrecords \
     --val_loc /share/pi/hackhack/preprocessed/val.image_wise.tfrecords \
-    --data_format data_format \
+    --data_format channels_first \
     --log_file train.log \
     --save_file chkpt.hdf5 \
     --log_steps -1 \
@@ -13,4 +13,5 @@ python train.py \
     --warmup_epochs 10 \
     --batch_size 1 \
     --use_se \
+    --n_val_sets 2 \
     --gpu

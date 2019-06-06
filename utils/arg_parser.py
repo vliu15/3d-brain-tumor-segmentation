@@ -101,6 +101,9 @@ def train_parser():
             help='Number of epochs for learning rate warmup.')
     parser.add_argument('--batch_size', type=int, default=1,
             help='Batch size to be used in training.')
+    parser.add_argument('--decoder_loss', type=str, default='dice',
+            choices=['dice', 'focal'],
+            help='Loss function to use to optimize decoder output.')
 
     # Model.
     parser = add_model_args(parser)

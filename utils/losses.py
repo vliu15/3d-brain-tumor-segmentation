@@ -165,6 +165,9 @@ class FocalLoss(tf.keras.losses.Loss):
         if self.smoothing > 0:
             y_true = y_true * (1.0 - self.smoothing) + (1.0 - y_true) * self.smoothing
 
+        # Clip values to avoid NaN calculations.
+        y_pred = tf.clip_by_value(y_pred, 1e-7, 1.0 - 1e-7)
+
         # Apply p to y=1 and (1-p) to (y!=1) positions.
         y_pred = y_true * y_pred + (1.0 - y_true) * (1.0 - y_pred)
 
@@ -176,6 +179,7 @@ class FocalLoss(tf.keras.losses.Loss):
 
 class CustomLoss(tf.keras.losses.Loss):
     def __init__(self,
+                 decoder_loss='dice',
                  name='custom_loss',
                  eps=1.0,
                  data_format='channels_last',
@@ -183,7 +187,10 @@ class CustomLoss(tf.keras.losses.Loss):
         super(CustomLoss, self).__init__(**kwargs)
         self.l2_loss = L2Loss(name='l2', **kwargs)
         self.kl_loss = KullbackLeiblerLoss(name='kl', **kwargs)
-        self.dice_loss = DiceLoss(name='dice', **kwargs)
+        if decoder_loss == 'dice':
+            self.dec_loss = DiceLoss(name='dice', **kwargs)
+        elif decoder_loss == 'focal':
+            self.dec_loss = FocalLoss(name='focal', **kwargs)
 
     def __call__(self, x, y_true, y_pred, y_vae, z_mean, z_logvar, sample_weight=None):
         n = tf.cast(tf.reduce_prod(x.shape), tf.float32)

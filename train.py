@@ -20,6 +20,7 @@ def custom_train(args):
                                       buffer_size=50, data_format=args.data_format, repeat=False)
     val_data = prepare_val_set(val_data, n_sets=args.n_val_sets,
                                 prob=args.mirror_prob, data_format=args.data_format)
+    n_val *= args.n_val_sets
     print('{} training examples.'.format(n_train))
     print('{} validation examples.'.format(n_val))
 
@@ -52,7 +53,7 @@ def custom_train(args):
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss and metrics.
-    loss_fn = CustomLoss(data_format=args.data_format)
+    loss_fn = CustomLoss(decoder_loss=args.decoder_loss, data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accu = tf.keras.metrics.BinaryAccuracy(name='train_accu')
