@@ -3,6 +3,7 @@ import os
 import glob
 import tensorflow as tf
 import numpy as np
+import scipy
 import nibabel as nib
 from tqdm import tqdm
 
@@ -29,10 +30,34 @@ def convert_to_nii(save_folder, mask):
     nib.save(img, os.path.join(save_folder, 'mask.nii'))
 
 
-def prepare_image(X, voxel_mean, voxel_std, data_format):
+def prepare_image(X, voxel_mean, voxel_std, data_format, interpolation):
     """Normalize image and sample crops to represent whole input."""
     # Expand batch dimension and normalize.
     X = (X - voxel_mean) / voxel_std
+
+    # Interpolate depthwise if needed.
+    if X.shape[2 if data_format == 'channels_last' else 3] < D:
+        if data_format == 'channels_first':
+            X = np.transpose(X, (1, 2, 3, 0))
+        X = np.reshape(X, newshape=(1, -1, X.shape[2], X.shape[-1])) # Reshape to [N, H*W, D, C]
+
+        mag = int(D / X.shape[depth_axis]) + 1
+        if interpolation == 'tile':
+            X = np.repeat(X, (1, 1, mag, 1))
+        else:
+            for i in range(IN_CH):
+                X[..., i] = scipy.interpolate.interpn(
+                                (np.array(range(0, mag*X.shape[0]), mag),
+                                 np.array(range(0, mag*X.shape[1]), mag),
+                                 np.array(range(0, mag*X.shape[2]), mag)),
+                                np.meshgrid(range(0, mag*X.shape[0]),
+                                            range(0, mag*X.shape[1]),
+                                            range(0, mag*X.shape[2]),
+                                            indexing='ij'),
+                                X[..., i],
+                                method=interpolation)
+        if data_format == 'channels_first':
+            X = np.transpose(X, (3, 0, 1, 2))
 
     # Crop to size.
     if data_format == 'channels_last':
@@ -80,12 +105,12 @@ def create_mask(y, data_format):
 
     def merge_d(d1, d2):
         if data_format == 'channels_last':
-            return tf.concat([d1[:, :, :-d_overlap :],
+            return tf.concat([d1[:, :, :-d_overlap, :],
                               tf.minimum(d1[:, :, -d_overlap:, :], d2[:, :, :d_overlap, :]),
                               d2[:, :, d_overlap:, :]], axis=2)
         elif data_format == 'channels_first':
-            return tf.concat([d1[:, :, :-d_overlap :],
-                              tf.minimum(d1[:, :, :,  -d_overlap:], d2[:, :, :, :d_overlap]),
+            return tf.concat([d1[:, :, :, :-d_overlap],
+                              tf.minimum(d1[:, :, :, -d_overlap:], d2[:, :, :, :d_overlap]),
                               d2[:, :, :, d_overlap:]], axis=-1)
 
     crop1, crop2, crop3, crop4, crop5, crop6, crop7, crop8 = [y[i, ...] for i in range(8)]
@@ -160,7 +185,7 @@ def main(args):
                 [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=0)
 
         # Prepare input image.
-        X = prepare_image(X, voxel_mean, voxel_std, args.data_format)
+        X = prepare_image(X, voxel_mean, voxel_std, args.data_format, args.interpolation)
 
         # Forward pass.
         with tf.device(args.device):
@@ -181,5 +206,5 @@ def main(args):
 
 if __name__ == '__main__':
     args = test_parser()
-    print(args)
+    print('Test args: {}'.format(args))
     main(args)

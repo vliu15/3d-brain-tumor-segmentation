@@ -25,37 +25,37 @@ CHANNELS_LAST_Y_SHAPE      =   (H, W, D, 1)
 
 
 # Encoder.
-ENC_CONV_LAYER_SIZE         =       16
+ENC_CONV_LAYER_SIZE         =       24
 
-ENC_CONV_BLOCK0_SIZE        =       16
+ENC_CONV_BLOCK0_SIZE        =       24
 ENC_CONV_BLOCK0_NUM         =       2
 
-ENC_CONV_BLOCK1_SIZE        =       32
+ENC_CONV_BLOCK1_SIZE        =       48
 ENC_CONV_BLOCK1_NUM         =       2
 
-ENC_CONV_BLOCK2_SIZE        =       64
+ENC_CONV_BLOCK2_SIZE        =       96
 ENC_CONV_BLOCK2_NUM         =       2
 
-ENC_CONV_BLOCK3_SIZE        =       128
+ENC_CONV_BLOCK3_SIZE        =       192
 ENC_CONV_BLOCK3_NUM         =       4
 
 
 # Decoder.
-DEC_CONV_BLOCK2_SIZE        =       64
-DEC_CONV_BLOCK1_SIZE        =       32
-DEC_CONV_BLOCK0_SIZE        =       16
+DEC_CONV_BLOCK2_SIZE        =       96
+DEC_CONV_BLOCK1_SIZE        =       48
+DEC_CONV_BLOCK0_SIZE        =       24
 
-DEC_CONV_LAYER_SIZE         =       16
+DEC_CONV_LAYER_SIZE         =       24
 
 
 # Variational Autoencoder.
 VAE_VD_CONV_SIZE            =       8
-VAE_VD_BLOCK_SIZE           =       128
+VAE_VD_BLOCK_SIZE           =       192
 
-VAE_LATENT_SIZE             =       64
+VAE_LATENT_SIZE             =       96
 
-VAE_VU_BLOCK_SIZE           =       128
+VAE_VU_BLOCK_SIZE           =       192
 
-VAE_CONV_BLOCK2_SIZE        =       64
-VAE_CONV_BLOCK1_SIZE        =       32
-VAE_CONV_BLOCK0_SIZE        =       16
+VAE_CONV_BLOCK2_SIZE        =       96
+VAE_CONV_BLOCK1_SIZE        =       48
+VAE_CONV_BLOCK0_SIZE        =       24

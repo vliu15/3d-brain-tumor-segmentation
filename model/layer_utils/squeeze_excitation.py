@@ -55,13 +55,14 @@ class SqueezeExcitation(tf.keras.layers.Layer):
         
             { GlobalAveragePool -> Dense+ReLu -> Dense+Sigmoid }
         """
+        batch_size = inputs.shape[0]
         inputs = self.global_pool(inputs)
         inputs = self.dense_relu(inputs)
         inputs = self.dense_sigmoid(inputs)
         if self.data_format == 'channels_last':
-            inputs = tf.reshape(inputs, shape=(1, 1, 1, 1, -1))
+            inputs = tf.reshape(inputs, shape=(batch_size, 1, 1, 1, -1))
         else:
-            inputs = tf.reshape(inputs, shape=(1, -1, 1, 1, 1))
+            inputs = tf.reshape(inputs, shape=(batch_size, -1, 1, 1, 1))
         return inputs
 
     def get_config(self):

@@ -167,4 +167,5 @@ def main(args):
 
 if __name__ == '__main__':
     args = prepro_parser()
+    print('Preprocess args: {}'.format(args))
     main(args)

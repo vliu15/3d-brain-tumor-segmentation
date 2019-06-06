@@ -177,6 +177,7 @@ class FocalLoss(tf.keras.losses.Loss):
         focus = (1 - y_pred) ** self.gamma
         return -tf.reduce_sum(alpha * focus * tf.math.log(y_pred))
 
+
 class CustomLoss(tf.keras.losses.Loss):
     def __init__(self,
                  decoder_loss='dice',
@@ -194,7 +195,7 @@ class CustomLoss(tf.keras.losses.Loss):
 
     def __call__(self, x, y_true, y_pred, y_vae, z_mean, z_logvar, sample_weight=None):
         n = tf.cast(tf.reduce_prod(x.shape), tf.float32)
-        return self.dice_loss(y_true, y_pred) + \
+        return self.dec_loss(y_true, y_pred) + \
                 0.1 * self.l2_loss(x, y_vae) + \
                 0.1 / n * self.kl_distribution_loss(z_mean, z_logvar)
 

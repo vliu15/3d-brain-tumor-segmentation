@@ -103,7 +103,7 @@ def train_parser():
             help='Batch size to be used in training.')
     parser.add_argument('--decoder_loss', type=str, default='dice',
             choices=['dice', 'focal'],
-            help='Loss function to use to optimize decoder output.')
+            help='Loss function to use to optimize decoder.')
 
     # Model.
     parser = add_model_args(parser)
@@ -131,6 +131,14 @@ def test_parser():
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')
+    parser.add_argument('--interpolation', type=str, default='linear',
+            choices=['linear', 'nearest'],
+            help='Method of interpolation if dimensions are too small.')
+
+    # Mask.
+    parser.add_argument('--merge', type=str, default='avg',
+            choices=['avg', 'min', 'max'],
+            help='Method of merging overlapping crops.')
 
     # Model path.
     parser.add_argument('--chkpt_file', type=str, required=True,
