@@ -133,10 +133,13 @@ def test_parser():
             choices=['linear', 'nearest'],
             help='Method of interpolation if dimensions are too small.')
 
-    # Mask.
-    parser.add_argument('--merge', type=str, default='avg',
-            choices=['avg', 'min', 'max'],
-            help='Method of merging overlapping crops.')
+    # Segmentation.
+    parser.add_argument('--threshold', type=float, default=0.5,
+            help='Threshold at which to create mask from probabilities.')
+    parser.add_argument('--stride', type=int, default=32,
+            help='Stride at which to take sample crops from inpute image.')
+    parser.add_argument('--batch_size', type=int, default=8,
+            help='Batch size of crops to load into model.')
 
     # Model path.
     parser.add_argument('--chkpt_file', type=str, required=True,

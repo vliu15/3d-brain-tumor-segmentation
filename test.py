@@ -6,10 +6,122 @@ import numpy as np
 import scipy
 import nibabel as nib
 from tqdm import tqdm
+import random
 
 from utils.arg_parser import test_parser
 from utils.constants import *
 from model.volumetric_cnn import VolumetricCNN
+
+
+class Generator(object):
+    def __init__(self, batch_size, stride=32, data_format='channels_last'):
+        self.batch_size = batch_size
+        self.stride = stride
+        self.data_format = data_format
+
+    def __call__(self, image):
+        """Generates crops with stride to create mask."""
+        def _get_crop(h, w, d):
+            if self.data_format == 'channels_last':
+                return image[h-H:h, w-W:w, d-D:d, :]
+            else:
+                return image[:, h-H:h, w-W:w, d-D:d]
+
+        if self.data_format == 'channels_last':
+            iH, iW, iD, _ = image.shape
+        else:
+            _, iH, iW, iD = image.shape
+
+        self._frequency = np.zeros(shape=(iH, iW, iD), dtype=np.float32)
+
+        batch = []
+        idxs = []
+
+        # Loop over all crops.
+        for h in range(H, iH + self.stride - 1, self.stride):
+            for w in range(W, iW + self.stride - 1, self.stride):
+                for d in range(D, iD + self.stride - 1, self.stride):
+                    h = min(h, iH)
+                    w = min(w, iW)
+                    d = min(d, iD)
+
+                    # Add crop to batch.
+                    crop = _get_crop(h, w, d)
+                    batch.append(crop)
+
+                    # Track indices to overlay crop later.
+                    idxs.append((h, w, d))
+
+                    # Update frequency.
+                    self._frequency[h-H:h, w-W:w, d-D:d] += 1.0
+
+                    if len(batch) == self.batch_size:
+                        yield (np.stack(batch, axis=0), idxs)
+                        batch = []
+                        idxs = []
+
+        if len(batch) > 0:
+            yield (np.stack(batch, axis=0), idxs)
+
+    @property
+    def frequency(self):
+        if self.data_format == 'channels_last':
+            return np.expand_dims(self._frequency, axis=-1)
+        else:
+            return np.expand_dims(self._frequency, axis=0)
+
+
+class Segmentor(object):
+    def __init__(self, model, device,
+                 threshold=0.5, data_format='channels_last', **kwargs):
+        self.model = model
+        self.device = device
+        self.threshold = threshold
+        self.data_format = data_format
+
+    def __call__(self, image, generator):
+        if self.data_format == 'channels_last':
+            axis = -1
+            output = np.zeros(shape=list(image.shape[:-1]) + [OUT_CH-1], dtype=np.float32)
+        else:
+            axis = 0
+            output = np.zeros(shape=[OUT_CH-1] + list(image.shape[1:]), dtype=np.float32)
+
+        for batch, idxs in generator(image):
+            # Generate predictions.
+            with tf.device(self.device):
+                y, *_ = self.model(batch, training=False)
+
+            # Accumulate predicted probabilities, average later.
+            for p, (h, w, d) in zip(y.numpy(), idxs):
+                if self.data_format == 'channels_last':
+                    output[h-H:h, w-W:w, d-D:d, :] += p
+                else:
+                    output[:, h-H:h, w-W:w, d-D:d] += p
+
+        output = tf.convert_to_tensor(output)
+
+        # Average predicted probabilities.
+        output /= generator.frequency
+
+        # Mask out values that correspond to values < threshold.
+        mask = tf.reduce_max(output, axis=axis)
+        mask = tf.cast(mask > self.threshold, tf.int32)
+
+        # Take the argmax to determine label.
+        output = tf.argmax(output, axis=axis, output_type=tf.int32)
+
+        # Mask out values that correspond to <0.5 probability.
+        output *= mask
+
+        # Convert [0, 1, 2] to [1, 2, 3] for label consistency.
+        output += 1
+
+        # Replace label `3` with `4` for consistency with data.
+        output = output.numpy()
+        np.place(output, output >= 3, [4])
+
+        return output
 
 
 def get_npy_image(subject_folder, name):
@@ -30,124 +142,6 @@ def convert_to_nii(save_folder, mask):
     nib.save(img, os.path.join(save_folder, 'mask.nii'))
 
 
-def prepare_image(X, voxel_mean, voxel_std, data_format, interpolation):
-    """Normalize image and sample crops to represent whole input."""
-    # Expand batch dimension and normalize.
-    X = (X - voxel_mean) / voxel_std
-
-    # Interpolate depthwise if needed.
-    if X.shape[2 if data_format == 'channels_last' else 3] < D:
-        if data_format == 'channels_first':
-            X = np.transpose(X, (1, 2, 3, 0))
-        X = np.reshape(X, newshape=(1, -1, X.shape[2], X.shape[-1])) # Reshape to [N, H*W, D, C]
-
-        mag = int(D / X.shape[depth_axis]) + 1
-        if interpolation == 'tile':
-            X = np.repeat(X, (1, 1, mag, 1))
-        else:
-            for i in range(IN_CH):
-                X[..., i] = scipy.interpolate.interpn(
-                                (np.array(range(0, mag*X.shape[0]), mag),
-                                 np.array(range(0, mag*X.shape[1]), mag),
-                                 np.array(range(0, mag*X.shape[2]), mag)),
-                                np.meshgrid(range(0, mag*X.shape[0]),
-                                            range(0, mag*X.shape[1]),
-                                            range(0, mag*X.shape[2]),
-                                            indexing='ij'),
-                                X[..., i],
-                                method=interpolation)
-        if data_format == 'channels_first':
-            X = np.transpose(X, (3, 0, 1, 2))
-
-    # Crop to size.
-    if data_format == 'channels_last':
-        crop1 = X[:H, :W, :D, :]
-        crop2 = X[-H:, :W, :D, :]
-        crop3 = X[:H, -W:, :D, :]
-        crop4 = X[-H:, -W:, :D, :]
-        crop5 = X[:H, :W, -D:, :]
-        crop6 = X[-H:, :W, -D:, :]
-        crop7 = X[:H, -W:, -D:, :]
-        crop8 = X[-H:, -W:, -D:, :]
-    elif data_format == 'channels_first':
-        crop1 = X[:, :H, :W, :D]
-        crop2 = X[:, -H:, :W, :D]
-        crop3 = X[:, :H, -W:, :D]
-        crop4 = X[:, -H:, -W:, :D]
-        crop5 = X[:, :H, :W, -D:]
-        crop6 = X[:, -H:, :W, -D:]
-        crop7 = X[:, :H, -W:, -D:]
-        crop8 = X[:, -H:, -W:, -D:]
-        
-    return np.stack([crop1, crop2, crop3, crop4, crop5, crop6, crop7, crop8], axis=0)
-
-
-def create_mask(y, data_format):
-    def merge_h(h1, h2):
-        if data_format == 'channels_last':
-            return tf.concat([h1[:-h_overlap, :, :, :],
-                              tf.minimum(h1[-h_overlap:, :, :, :], h2[:h_overlap, :, :, :]),
-                              h2[h_overlap:, :, :, :]], axis=0)
-        elif data_format == 'channels_first':
-            return tf.concat([h1[:, :-h_overlap, :, :],
-                              tf.minimum(h1[:, -h_overlap:, :, :], h2[:, :h_overlap, :, :]),
-                              h2[:, h_overlap:, :, :]], axis=1)
-
-    def merge_w(w1, w2):
-        if data_format == 'channels_last':
-            return tf.concat([w1[:, :-w_overlap, :, :],
-                              tf.minimum(w1[:, -w_overlap:, :, :], w2[:, :w_overlap, :, :]),
-                              w2[:, w_overlap:, :, :]], axis=1)
-        elif data_format == 'channels_first':
-            return tf.concat([w1[:, :, :-w_overlap, :],
-                              tf.minimum(w1[:, :, -w_overlap:, :], w2[:, :, :w_overlap, :]),
-                              w2[:, :, w_overlap:, :]], axis=2)
-
-    def merge_d(d1, d2):
-        if data_format == 'channels_last':
-            return tf.concat([d1[:, :, :-d_overlap, :],
-                              tf.minimum(d1[:, :, -d_overlap:, :], d2[:, :, :d_overlap, :]),
-                              d2[:, :, d_overlap:, :]], axis=2)
-        elif data_format == 'channels_first':
-            return tf.concat([d1[:, :, :, :-d_overlap],
-                              tf.minimum(d1[:, :, :, -d_overlap:], d2[:, :, :, :d_overlap]),
-                              d2[:, :, :, d_overlap:]], axis=-1)
-
-    crop1, crop2, crop3, crop4, crop5, crop6, crop7, crop8 = [y[i, ...] for i in range(8)]
-
-    # Calculate region of overlap.
-    h_overlap = 2 * H - RAW_H
-    w_overlap = 2 * W - RAW_W
-    d_overlap = 2 * D - RAW_D
-
-    h1 = merge_h(crop1, crop2)
-    h2 = merge_h(crop3, crop4)
-    h3 = merge_h(crop5, crop6)
-    h4 = merge_h(crop7, crop8)
-
-    w1 = merge_w(h1, h2)
-    w2 = merge_w(h3, h4)
-
-    d1 = merge_d(w1, w2)
-
-    axis = -1 if data_format == 'channels_last' else 0
-
-    # Mask out values that correspond to values < 0.5.
-    mask = tf.reduce_max(d1, axis=axis)
-    mask = tf.cast(mask > 0.5, tf.int32)
-
-    # Take the argmax to determine label.
-    seg_mask = tf.argmax(d1, axis=axis, output_type=tf.int32)
-
-    # Convert [0, 1, 2] to [1, 2, 3] for consistency.
-    seg_mask += 1
-
-    # Mask out values that correspond to <0.5 probability.
-    seg_mask *= mask
-
-    return seg_mask
-
-
 def main(args):
     # Initialize.
     data = np.load(args.prepro_file)
@@ -160,7 +154,6 @@ def main(args):
                         kernel_size=args.conv_kernel_size,
                         groups=args.gn_groups,
                         reduction=args.se_reduction,
-                        use_se=args.use_se,
                         kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
                         kernel_initializer=args.kernel_init,
                         downsampling=args.downsamp,
@@ -172,6 +165,10 @@ def main(args):
                                     else (1, IN_CH, H, W, D)))
     # Load weights.
     model.load_weights(args.chkpt_file)
+
+    # Initialize generator and segmentor.
+    generator = Generator(args.batch_size, stride=args.stride, data_format=args.data_format)
+    segmentor = Segmentor(model, args.device, threshold=0.5, data_format=args.data_format)
 
     # Loop through each patient.
     for subject_folder in tqdm(glob.glob(os.path.join(args.test_folder, '*'))):
@@ -185,23 +182,16 @@ def main(args):
                 [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=0)
 
         # Prepare input image.
-        X = prepare_image(X, voxel_mean, voxel_std, args.data_format, args.interpolation)
+        X = (X - voxel_mean) / voxel_std
 
-        # Forward pass.
-        with tf.device(args.device):
-            y, *_ = model(X, training=False)
+        # Generate segmentation.
+        mask = segmentor(X, generator)
 
-            # Create mask.
-            mask = create_mask(y, args.data_format).numpy()
+        # Save as Numpy.
+        np.save(os.path.join(args.test_folder, subject_folder, 'mask.npy'), mask)
 
-            # Replace label `3` with `4` for consistency with data.
-            np.place(mask, mask >= 3, [4])
-
-            # Save as Numpy.
-            np.save(os.path.join(args.test_folder, subject_folder, 'mask.npy'), mask)
-
-            # Save as Nifti.
-            convert_to_nii(os.path.join(args.test_folder, subject_folder), mask)
+        # Save as Nifti.
+        convert_to_nii(os.path.join(args.test_folder, subject_folder), mask)
 
 
 if __name__ == '__main__':

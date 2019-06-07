@@ -5,4 +5,7 @@ python test.py \
             --data_format channels_first \
             --chkpt_file chkpt.hdf5 \
             --prepro_file /share/pi/hackhack/preprocessed/image_mean_std.npy \
+            --stride 32 \
+            --threshold 0.5 \
+            --batch_size 8 \
             --gpu
