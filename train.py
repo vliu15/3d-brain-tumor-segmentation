@@ -254,7 +254,7 @@ def train(args):
                                   str(train_prec.result().numpy()),
                                   str(train_reca.result().numpy()),
                                   str(train_dice.result().numpy()),
-                                  str(train_haus.result().numpy())
+                                  str(train_haus.result().numpy()),
                                   str(val_loss.result().numpy()),
                                   str(val_prec.result().numpy()),
                                   str(val_reca.result().numpy()),
