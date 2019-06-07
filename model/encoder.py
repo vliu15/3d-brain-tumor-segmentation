@@ -14,7 +14,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                  reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False,
                  downsampling='max',
                  normalization='group'):
         """Initializes the model encoder.
@@ -53,7 +52,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
                             'downsampling': downsampling,
-                            'use_se': use_se,
                             'normalization': normalization})
 
         # Retrieve downsampling method.
@@ -69,7 +67,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 kernel_initializer=kernel_initializer,
                                 normalization=normalization)
 
-        # First ConvBlock: filters=32, x1.
+        # First ConvBlock: filters=24, x1.
         self.conv_block_0 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK0_SIZE,
                                 kernel_size=kernel_size,
@@ -78,7 +76,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
                                 kernel_initializer=kernel_initializer,
-                                use_se=use_se,
                                 normalization=normalization) for _ in range(ENC_CONV_BLOCK0_NUM)]
         self.conv_downsamp_0 = Downsample(
                                 filters=ENC_CONV_BLOCK0_SIZE,
@@ -89,7 +86,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 kernel_initializer=kernel_initializer,
                                 normalization=normalization)
 
-        # Second ConvBlock: filters=64, x2.
+        # Second ConvBlock: filters=48, x2.
         self.conv_block_1 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK1_SIZE,
                                 kernel_size=kernel_size,
@@ -98,7 +95,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
                                 kernel_initializer=kernel_initializer,
-                                use_se=use_se,
                                 normalization=normalization) for _ in range(ENC_CONV_BLOCK1_NUM)]
         self.conv_downsamp_1 = Downsample(
                                 filters=ENC_CONV_BLOCK1_SIZE,
@@ -109,7 +105,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 kernel_initializer=kernel_initializer,
                                 normalization=normalization)
 
-        # Third ConvBlock: filters=128, x2.
+        # Third ConvBlock: filters=96, x2.
         self.conv_block_2 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK2_SIZE,
                                 kernel_size=kernel_size,
@@ -118,7 +114,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
                                 kernel_initializer=kernel_initializer,
-                                use_se=use_se,
                                 normalization=normalization) for _ in range(ENC_CONV_BLOCK2_NUM)]
         self.conv_downsamp_2 = Downsample(
                                 filters=ENC_CONV_BLOCK2_SIZE,
@@ -127,10 +122,9 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
                                 kernel_initializer=kernel_initializer,
-                                use_se=use_se,
                                 normalization=normalization)
 
-        # Fourth ConvBlock: filters=256, x4.
+        # Fourth ConvBlock: filters=192, x4.
         self.conv_block_3 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK3_SIZE,
                                 kernel_size=kernel_size,
@@ -139,7 +133,6 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
                                 kernel_initializer=kernel_initializer,
-                                use_se=use_se,
                                 normalization=normalization) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
     def call(self, inputs, training=None):
@@ -168,25 +161,25 @@ class ConvEncoder(tf.keras.layers.Layer):
         # Input layers.
         inputs = self.inp_conv(inputs, training=training)
 
-        # First ConvBlock: filters=32, x1.
+        # First ConvBlock: filters=24, x1.
         for conv in self.conv_block_0:
             inputs = conv(inputs, training=training)
         conv_out_0 = inputs
         inputs = self.conv_downsamp_0(inputs, training=training)
 
-        # Second ConvBlock: filters=64, x2.
+        # Second ConvBlock: filters=48, x2.
         for conv in self.conv_block_1:
             inputs = conv(inputs, training=training)
         conv_out_1 = inputs
         inputs = self.conv_downsamp_1(inputs, training=training)
 
-        # Third ConvBlock: filters=128. x2.
+        # Third ConvBlock: filters=96. x2.
         for conv in self.conv_block_2:
             inputs = conv(inputs, training=training)
         conv_out_2 = inputs
         inputs = self.conv_downsamp_2(inputs, training=training)
 
-        # Fourth ConvBlock: filters=256, x4.
+        # Fourth ConvBlock: filters=192, x4.
         for conv in self.conv_block_3:
             inputs = conv(inputs, training=training)
 

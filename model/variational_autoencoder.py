@@ -23,7 +23,6 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                  groups=8,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False,
                  upsampling='linear',
                  normalization='group'):
         """Initializes a variational autoencoder block.
@@ -62,7 +61,6 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
-                            'use_se': use_se,
                             'normalization': normalization})
 
         # Retrieve upsampling method.
@@ -92,7 +90,6 @@ class VariationalAutoencoderBlock(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=kernel_regularizer,
                                 kernel_initializer=kernel_initializer,
-                                use_se=use_se,
                                 normalization=normalization)
 
     def call(self, inputs, training=None):
@@ -117,7 +114,6 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                  kernel_size=3,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False,
                  downsampling='max',
                  upsampling='linear',
                  normalization='group'):
@@ -153,7 +149,6 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                             'kernel_size': kernel_size,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
-                            'use_se': use_se,
                             'downsampling': downsampling,
                             'upsampling': upsampling,
                             'normalization': normalization})
@@ -218,7 +213,6 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer,
                                     kernel_initializer=kernel_initializer,
                                     upsampling=upsampling,
-                                    use_se=use_se,
                                     normalization=normalization)
 
         self.conv_block_1 = VariationalAutoencoderBlock(
@@ -230,7 +224,6 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer,
                                     kernel_initializer=kernel_initializer,
                                     upsampling=upsampling,
-                                    use_se=use_se,
                                     normalization=normalization)
 
         self.conv_block_0 = VariationalAutoencoderBlock(
@@ -242,7 +235,6 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                                     kernel_regularizer=kernel_regularizer,
                                     kernel_initializer=kernel_initializer,
                                     upsampling=upsampling,
-                                    use_se=use_se,
                                     normalization=normalization)
 
         self.conv_out = tf.keras.layers.Conv3D(

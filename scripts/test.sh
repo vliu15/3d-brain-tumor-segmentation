@@ -5,5 +5,4 @@ python test.py \
             --data_format channels_first \
             --chkpt_file chkpt-1.hdf5 \
             --prepro_file /share/pi/hackhack/preprocessed/image_mean_std.npy \
-            --use_se \
             --gpu

@@ -14,5 +14,4 @@ python train.py \
     --batch_size 1 \
     --decoder_loss dice \
     --n_val_sets 2 \
-    --use_se \
     --gpu

@@ -9,8 +9,6 @@ We adopt the encoder-decoder convolutional architecture described in the [above 
  - Use He normal initialization for *all* layer kernels except those with sigmoid activations, which we use Glorot normal initialization for.
  - Add per-epoch learning rate linear warmup from a base learning rate of `1e-6` for the first 10 epochs.
 
-> Use the `--use_se` flag to add squeeze-excitation layers to the model during training.
-
 > Use the `--norm [group, batch, layer]` flag to specify the normalization mechanism. Defaults to `group` for group normalization.
 
 > Use the `--downsamp [max, avg, conv]` flag to specify the downsampling method. Defaults to `max` for max pooling.

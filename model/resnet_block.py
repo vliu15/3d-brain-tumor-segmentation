@@ -93,7 +93,6 @@ class ConvBlock(tf.keras.layers.Layer):
                  reduction=2,
                  kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
                  kernel_initializer='he_normal',
-                 use_se=False,
                  normalization='group'):
         """Initializes one convolutional block.
 
@@ -120,8 +119,6 @@ class ConvBlock(tf.keras.layers.Layer):
                     Reduction ratio for excitation size in squeeze-excitation layer.
                 kernel_regularizer: tf.keras.regularizer callable, optional
                     Kernel regularizer for convolutional operations.
-                use_se: bool, optional
-                    Whether to apply a squeeze-excitation layer to the residual.
         """
         super(ConvBlock, self).__init__()
         # Set up config for self.get_config() to serialize later.
@@ -133,8 +130,7 @@ class ConvBlock(tf.keras.layers.Layer):
                             'reduction': reduction,
                             'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
                             'kernel_initializer': kernel_initializer,
-                            'normalization': normalization,
-                            'use_se': use_se})
+                            'normalization': normalization})
 
         self.conv3d_ptwise = tf.keras.layers.Conv3D(
                                 filters=filters,
@@ -144,12 +140,10 @@ class ConvBlock(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_initializer=kernel_initializer,
                                 kernel_regularizer=kernel_regularizer)
-        self.use_se = use_se
-        if self.use_se:
-            self.se_layer = SqueezeExcitation(
-                                reduction=reduction,
-                                data_format=data_format)
-            self.scale = tf.keras.layers.Multiply()
+        self.se_layer = SqueezeExcitation(
+                            reduction=reduction,
+                            data_format=data_format)
+        self.scale = tf.keras.layers.Multiply()
         self.conv_layer1 = ConvLayer(
                                 filters=filters,
                                 kernel_size=kernel_size,
@@ -173,11 +167,8 @@ class ConvBlock(tf.keras.layers.Layer):
 
             { Conv3D_pointwise -> ConvLayer -> ConvLayer -> Residual }
         """
-        if self.use_se:
-            inputs = self.conv3d_ptwise(inputs)
-            res = self.scale([self.se_layer(inputs, training=training), inputs])
-        else:
-            res = self.conv3d_ptwise(inputs)
+        inputs = self.conv3d_ptwise(inputs)
+        res = self.scale([self.se_layer(inputs, training=training), inputs])
         inputs = self.conv_layer1(inputs, training=training)
         inputs = self.conv_layer2(inputs, training=training)
         inputs = self.residual([res, inputs])

@@ -8,7 +8,6 @@ from utils.losses import DiceLoss, CustomLoss
 from utils.metrics import DiceCoefficient, HausdorffDistance
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
-from utils.utils import prepare_dataset, prepare_batch, prepare_val_set
 from model.volumetric_cnn import VolumetricCNN
 
 
@@ -92,7 +91,7 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
     return dataset, dataset_len
 
 
-def custom_train(args):
+def train(args):
     # Load data.
     train_data, n_train = prepare_dataset(args.train_loc, args.batch_size,
                                           buffer_size=100, data_format=args.data_format, repeat=False)
@@ -110,7 +109,6 @@ def custom_train(args):
                     kernel_size=args.conv_kernel_size,
                     groups=args.gn_groups,
                     reduction=args.se_reduction,
-                    use_se=args.use_se,
                     kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
                     kernel_initializer=args.kernel_init,
                     downsampling=args.downsamp,
@@ -296,4 +294,4 @@ def custom_train(args):
 if __name__ == '__main__':
     args = train_parser()
     print('Train args: {}'.format(args), flush=True)
-    custom_train(args)
+    train(args)

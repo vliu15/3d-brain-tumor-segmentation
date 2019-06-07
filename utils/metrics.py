@@ -6,7 +6,16 @@ except:
     directed_hausdorff = None
 
 from utils.constants import *
-from utils.utils import pred_to_one_hot
+
+
+def pred_to_one_hot(pred, data_format):
+    """Converts output of predicted probabilites to one-hot encodings."""
+    axis = -1 if data_format == 'channels_last' else 1
+    pred = tf.argmax(pred, axis=axis, output_type=tf.int32)
+    pred = tf.one_hot(pred, OUT_CH, axis=axis, dtype=tf.float32)
+
+    return pred
+
 
 # TODO: Fix dependencies for scipy.
 class HausdorffDistance(tf.keras.metrics.Mean):
