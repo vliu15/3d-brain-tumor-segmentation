@@ -20,10 +20,13 @@ class HausdorffDistance(tf.keras.metrics.Mean):
         y_true = tf.reshape(y_true, shape=(1, -1))
         y_pred = tf.reshape(y_pred, shape=(1, -1))
         if directed_hausdorff:
-            return tf.reduce_max(directed_hausdorff(y_true, y_pred)[0],
-                                 directed_hausdorff(y_pred, y_true)[0])
+            haus_dist = tf.maximum(directed_hausdorff(y_true, y_pred)[0],
+                                directed_hausdorff(y_pred, y_true)[0])
+            return super(HausdorffDistance, self).update_state(
+                                haus_dist, sample_weight=sample_weight)
         else:
-            raise NotImplementedError('Failed to import scipy.spatial.distance.directed_hausdorff.')
+            raise super(HausdorffDistance, self).update_state(
+                                float('inf'), sample_weight=sample_weight)
 
 
 class DiceCoefficient(tf.keras.metrics.Mean):
