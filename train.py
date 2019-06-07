@@ -138,14 +138,14 @@ def train(args):
     train_prec = tf.keras.metrics.Precision(name='train_prec')
     train_reca = tf.keras.metrics.Recall(name='train_reca')
     train_dice = DiceCoefficient(name='train_dice', data_format=args.data_format)
-    train_haus = HausdorffDistance(name='hausdorff_distance')
+    train_haus = HausdorffDistance(name='train_haus', data_format=args.data_format)
 
     val_loss = tf.keras.metrics.Mean(name='val_loss')
     val_accu = tf.keras.metrics.BinaryAccuracy(name='val_accu')
     val_prec = tf.keras.metrics.Precision(name='val_prec')
     val_reca = tf.keras.metrics.Recall(name='val_reca')
     val_dice = DiceCoefficient(name='val_dice', data_format=args.data_format)
-    val_haus = HausdorffDistance(name='hausdorff_distance')
+    val_haus = HausdorffDistance(name='val_haus', data_format=args.data_format)
 
     # Load model weights if specified.
     if args.load_file:

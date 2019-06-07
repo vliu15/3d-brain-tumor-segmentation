@@ -1,9 +1,6 @@
 """Contains custom metrics for evaluation."""
 import tensorflow as tf
-try:
-    from scipy.spatial.distance import directed_hausdorff
-except:
-    directed_hausdorff = None
+from scipy.spatial.distance import directed_hausdorff
 
 from utils.constants import *
 
@@ -14,7 +11,7 @@ def pred_to_one_hot(pred, data_format):
 
     # Mask out values that correspond to values < 0.5.
     mask = tf.reduce_max(d1, axis=axis, keepdims=True)
-    mask = tf.cast(mask > 0.5, tf.int32)
+    mask = tf.cast(mask > 0.5, tf.float32)
 
     pred = tf.argmax(pred, axis=axis, output_type=tf.int32)
     pred = tf.one_hot(pred, OUT_CH, axis=axis, dtype=tf.float32)
@@ -23,26 +20,23 @@ def pred_to_one_hot(pred, data_format):
     return pred
 
 
-# TODO: Fix dependencies for scipy.
 class HausdorffDistance(tf.keras.metrics.Mean):
     def __init__(self,
-                 name='hausdorff_distance'):
+                 name='hausdorff_distance',
+                 data_format='channels_last'):
         super(HausdorffDistance, self).__init__(name=name)
+        self.data_format = data_format
 
     def __call__(self, y_true, y_pred, sample_weight=None):
-        y_pred = pred_to_one_hot(y_pred, data_format=data_format)
+        y_pred = pred_to_one_hot(y_pred, self.data_format)
 
         y_true = tf.reshape(y_true, shape=(1, -1))
         y_pred = tf.reshape(y_pred, shape=(1, -1))
-        if directed_hausdorff:
-            haus_dist = tf.maximum(
-                            directed_hausdorff(y_true.numpy(), y_pred.numpy())[0],
-                            directed_hausdorff(y_pred.numpy(), y_true.numpy())[0])
-            return super(HausdorffDistance, self).update_state(
-                                haus_dist, sample_weight=sample_weight)
-        else:
-            return super(HausdorffDistance, self).update_state(
-                                float('inf'), sample_weight=sample_weight)
+        haus_dist = tf.maximum(
+                        directed_hausdorff(y_true.numpy(), y_pred.numpy())[0],
+                        directed_hausdorff(y_pred.numpy(), y_true.numpy())[0])
+        return super(HausdorffDistance, self).update_state(
+                            haus_dist, sample_weight=sample_weight)
 
 
 class DiceCoefficient(tf.keras.metrics.Mean):
@@ -59,7 +53,7 @@ class DiceCoefficient(tf.keras.metrics.Mean):
         axis = (0, 1, 2, 3) if self.data_format == 'channels_last' else (0, 2, 3, 4)
         
         # Correct predictions will have 1, else 0.
-        y_pred = pred_to_one_hot(y_pred, data_format=data_format)
+        y_pred = pred_to_one_hot(y_pred, self.data_format)
         intersection = tf.reduce_sum(y_pred * y_true, axis=axis)
 
         pred = tf.reduce_sum(y_pred, axis=axis)
