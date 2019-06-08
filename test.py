@@ -13,8 +13,60 @@ from utils.constants import *
 from model.volumetric_cnn import VolumetricCNN
 
 
+class Interpolator(object):
+    """Depthwise interpolator for shorter images."""
+    def __init__(self, data_format='channels_last'):
+        self.data_format = data_format
+
+    def __call__(self, image):
+        def interpolate(slice1, slice2):
+            step = (slice2 - slice1) / self._ratio
+            return tf.stack([slice1 + i*step for i in range(self._ratio)], axis=d_axis)
+
+        self.image_shape = image.shape
+        d_axis = 2 if self.data_format == 'channels_last' else -1
+        d = image.shape[d_axis]
+
+        # Determine upscaling ratio.
+        self._ratio = (D // (d-1)) + 1
+
+        # Check if image is sufficiently sized.
+        if self._ratio == 1:
+            return image
+
+        # Loop through and fill in slices.
+        output = tf.concat([interpolate(image[:, :, :, i], image[:, :, :, i+1])
+                                for i in range(d-1)], axis=d_axis)
+
+        # Add on end slice.
+        end = image[:, :, -1, :] if self.data_format == 'channels_last' else image[:, :, :, -1]
+        output = tf.concat([output, tf.expand_dims(end, axis=d_axis)], axis=d_axis)
+
+        return output
+
+    def reverse(self, output):
+        """Compresses interpolated output to original size."""
+        if self._ratio == 1:
+            return output
+
+        d_axis = 2 if self.data_format == 'channels_last' else -1
+        d = output.shape[d_axis]
+        window = self._ratio // 2
+
+        # Each depth is the average of the window of values around it.
+        if self.data_format == 'channels_last':
+            output = tf.stack([tf.reduce_mean(output[:, :, max(i-window, 0):min(i+window, d), :], axis=d_axis)
+                        for i in range(0, d, self._ratio)], axis=d_axis)
+        else:
+            output = tf.stack([tf.reduce_mean(output[:, :, :, max(i-window, 0):min(i+window, d)], axis=d_axis)
+                        for i in range(0, d, self._ratio)], axis=d_axis)
+
+        return output
+
+
 class Generator(object):
-    def __init__(self, batch_size, stride=32, data_format='channels_last'):
+    def __init__(self, batch_size, stride=32,
+                 data_format='channels_last'):
         self.batch_size = batch_size
         self.stride = stride
         self.data_format = data_format
@@ -27,15 +79,9 @@ class Generator(object):
             else:
                 return image[:, h-H:h, w-W:w, d-D:d]
 
-        if self.data_format == 'channels_last':
-            iH, iW, iD, _ = image.shape
-        else:
-            _, iH, iW, iD = image.shape
-
+        iH, iW, iD = image.shape[:-1] if self.data_format == 'channels_last' else image.shape[1:]
         self._frequency = np.zeros(shape=(iH, iW, iD), dtype=np.float32)
-
-        batch = []
-        idxs = []
+        batch, idxs = [], []
 
         # Loop over all crops.
         for h in range(H, iH + self.stride - 1, self.stride):
@@ -45,52 +91,40 @@ class Generator(object):
                     w = min(w, iW)
                     d = min(d, iD)
 
-                    # Add crop to batch.
-                    crop = _get_crop(h, w, d)
-                    batch.append(crop)
-
-                    # Track indices to overlay crop later.
+                    batch.append(_get_crop(h, w, d))
                     idxs.append((h, w, d))
 
                     # Update frequency.
                     self._frequency[h-H:h, w-W:w, d-D:d] += 1.0
 
                     if len(batch) == self.batch_size:
-                        yield (np.stack(batch, axis=0), idxs)
-                        batch = []
-                        idxs = []
+                        yield (tf.stack(batch, axis=0), idxs)
+                        batch, idxs = [], []
 
         if len(batch) > 0:
-            yield (np.stack(batch, axis=0), idxs)
+            yield (tf.stack(batch, axis=0), idxs)
 
     @property
     def frequency(self):
-        if self.data_format == 'channels_last':
-            return np.expand_dims(self._frequency, axis=-1)
-        else:
-            return np.expand_dims(self._frequency, axis=0)
+        return tf.expand_dims(self._frequency, axis=-1 if self.data_format == 'channels_last' else 0)
 
 
 class Segmentor(object):
-    def __init__(self, model, device,
-                 threshold=0.5, data_format='channels_last', **kwargs):
+    def __init__(self, model, threshold=0.5,
+                 data_format='channels_last', **kwargs):
         self.model = model
-        self.device = device
         self.threshold = threshold
         self.data_format = data_format
 
     def __call__(self, image, generator):
         if self.data_format == 'channels_last':
-            axis = -1
             output = np.zeros(shape=list(image.shape[:-1]) + [OUT_CH-1], dtype=np.float32)
         else:
-            axis = 0
             output = np.zeros(shape=[OUT_CH-1] + list(image.shape[1:]), dtype=np.float32)
 
         for batch, idxs in generator(image):
             # Generate predictions.
-            with tf.device(self.device):
-                y, *_ = self.model(batch, training=False)
+            y, *_ = self.model(batch, inference=True)
 
             # Accumulate predicted probabilities, average later.
             for p, (h, w, d) in zip(y.numpy(), idxs):
@@ -101,8 +135,10 @@ class Segmentor(object):
 
         output = tf.convert_to_tensor(output)
 
-        # Average predicted probabilities.
-        output /= generator.frequency
+        return output / generator.frequency
+
+    def create_mask(self, output):
+        axis = -1 if self.data_format == 'channels_last' else 0
 
         # Mask out values that correspond to values < threshold.
         mask = tf.reduce_max(output, axis=axis)
@@ -145,8 +181,8 @@ def convert_to_nii(save_folder, mask):
 def main(args):
     # Initialize.
     data = np.load(args.prepro_file)
-    voxel_mean = data.item()['mean'].astype(np.float32)
-    voxel_std = data.item()['std'].astype(np.float32)
+    voxel_mean = tf.convert_to_tensor(data.item()['mean'], dtype=tf.float32)
+    voxel_std = tf.convert_to_tensor(data.item()['std'], dtype=tf.float32)
     
     # Initialize model.
     model = VolumetricCNN(
@@ -166,29 +202,38 @@ def main(args):
     # Load weights.
     model.load_weights(args.chkpt_file)
 
-    # Initialize generator and segmentor.
+    # Initialize interpolator, generator, and segmentor.
+    interpolator = Interpolator(data_format=args.data_format)
     generator = Generator(args.batch_size, stride=args.stride, data_format=args.data_format)
-    segmentor = Segmentor(model, args.device, threshold=0.5, data_format=args.data_format)
+    segmentor = Segmentor(model, threshold=0.5, data_format=args.data_format)
 
     # Loop through each patient.
     for subject_folder in tqdm(glob.glob(os.path.join(args.test_folder, '*'))):
 
-        # Extract raw images from each.
-        if args.data_format == 'channels_last':
-            X = np.stack(
-                [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=-1)
-        elif args.data_format == 'channels_first':
-            X = np.stack(
-                [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=0)
+        with tf.device(args.device):
+            # Extract raw images from each.
+            if args.data_format == 'channels_last':
+                X = tf.stack(
+                    [get_npy_image(subject_folder, name) for name in RTOG_MODALITIES], axis=-1)
+            elif args.data_format == 'channels_first':
+                X = tf.stack(
+                    [get_npy_image(subject_folder, name) for name in RTOG_MODALITIES], axis=0)
 
-        # Prepare input image.
-        X = (X - voxel_mean) / voxel_std
+            # Normalize input image.
+            X = tf.convert_to_tensor(X, dtype=tf.float32)
+            X = (X - voxel_mean) / voxel_std
 
-        # Generate segmentation.
-        mask = segmentor(X, generator)
+            # Interpolate depth (if necessary).
+            X = interpolator(X)
 
-        # Save as Numpy.
-        np.save(os.path.join(args.test_folder, subject_folder, 'mask.npy'), mask)
+            # Generate probabilities.
+            y = segmentor(X, generator)
+
+            # Compress interpolation (if necessary).
+            y = interpolator.reverse(y)
+
+            # Create mask.
+            mask = segmentor.create_mask(y)
 
         # Save as Nifti.
         convert_to_nii(os.path.join(args.test_folder, subject_folder), mask)

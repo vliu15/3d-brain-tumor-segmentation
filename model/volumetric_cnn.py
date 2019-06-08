@@ -71,13 +71,15 @@ class VolumetricCNN(tf.keras.models.Model):
                             upsampling=upsampling,
                             normalization=normalization)
 
-    def call(self, inputs, training=None):
+    def call(self, inputs, training=None, inference=None):
         """Returns the forward pass of the VolumetricCNN model.
         
             { Encoder -> [Decoder + Residuals, VAE] }
         """
         enc_outs = self.encoder(inputs, training=training)
         y_pred = self.decoder(enc_outs, training=training)
+        if inference:
+            return (y_pred, None, None, None)
         y_vae, z_mean, z_logvar = self.vae(enc_outs[-1], training=training)
 
         return (y_pred, y_vae, z_mean, z_logvar)
