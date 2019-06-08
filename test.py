@@ -161,7 +161,6 @@ class Segmentor(object):
 
 
 def get_npy_image(subject_folder, name):
-    """Returns np.array from .nii files."""
     try:
         file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii' + '*'))[0]
     except:
@@ -220,7 +219,6 @@ def main(args):
                     [get_npy_image(subject_folder, name) for name in RTOG_MODALITIES], axis=0)
 
             # Normalize input image.
-            X = tf.convert_to_tensor(X, dtype=tf.float32)
             X = (X - voxel_mean) / voxel_std
 
             # Interpolate depth (if necessary).
