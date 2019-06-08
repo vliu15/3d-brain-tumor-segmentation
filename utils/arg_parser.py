@@ -129,9 +129,6 @@ def test_parser():
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')
-    parser.add_argument('--interpolation', type=str, default='linear',
-            choices=['linear', 'nearest'],
-            help='Method of interpolation if dimensions are too small.')
 
     # Segmentation.
     parser.add_argument('--threshold', type=float, default=0.5,

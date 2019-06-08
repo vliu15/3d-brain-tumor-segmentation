@@ -56,6 +56,12 @@ python test.py --test_folder /path/to/test/data --prepro_file data/image_mean_st
 ```
 *You must specify the same model parameters as the ones use in training for the trained weights to be successfully loaded.*
 
+> Use the `--stride` to indicate the stride between cropping to cover the input. `64` is used as default, and each image takes around ~20 seconds.
+
+> Use the `--batch_size` flag to indicate the number of crops fed into the model at a time, per example.
+
+> The `Interpolator` class is used to interpolate linearly depthwise, if some of the inputs are shallower in depth.
+
 ### Results
 We run training on a V100 32GB GPU. Each epoch takes around ~10-15 minutes to run. Below is a sample training curve, using all default model parameters.
 
