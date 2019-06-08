@@ -124,7 +124,7 @@ class Segmentor(object):
 
         for batch, idxs in generator(image):
             # Generate predictions.
-            y, *_ = self.model(batch, inference=True)
+            y, *_ = self.model(batch, training=False, inference=True)
 
             # Accumulate predicted probabilities, average later.
             for p, (h, w, d) in zip(y.numpy(), idxs):

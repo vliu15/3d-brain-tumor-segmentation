@@ -76,6 +76,9 @@ class VolumetricCNN(tf.keras.models.Model):
         
             { Encoder -> [Decoder + Residuals, VAE] }
         """
+        assert (not inference or not training), \
+            'Cannot run training and inference modes simultaneously.'
+
         enc_outs = self.encoder(inputs, training=training)
         y_pred = self.decoder(enc_outs, training=training)
         if inference:
