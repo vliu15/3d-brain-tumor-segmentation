@@ -46,7 +46,7 @@ def prepare_val_set(dataset, n_sets=2, prob=0.5, data_format='channels_last'):
     return val_set
 
 
-def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_last', repeat=False):
+def prepare_dataset(path, batch_size, buffer_size=100, data_format='channels_last', val=False):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
         parsed = tf.io.parse_single_example(example_proto, example_desc)
@@ -54,13 +54,13 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
             X = tf.reshape(parsed['X'], (RAW_H, RAW_W, RAW_D, IN_CH))
             y = tf.reshape(parsed['y'], (RAW_H, RAW_W, RAW_D, 1))
             y = tf.squeeze(tf.cast(y, tf.int32), axis=-1)
-            y = tf.one_hot(y, OUT_CH, axis=-1, dtype=tf.float32)
+            y = tf.one_hot(y, OUT_CH+1, axis=-1, dtype=tf.float32)
             y = y[:, :, :, 1:]
         elif data_format == 'channels_first':
             X = tf.reshape(parsed['X'], (IN_CH, RAW_H, RAW_W, RAW_D))
             y = tf.reshape(parsed['y'], (1, RAW_H, RAW_W, RAW_D))
             y = tf.squeeze(tf.cast(y, tf.int32), axis=0)
-            y = tf.one_hot(y, OUT_CH, axis=0, dtype=tf.float32)
+            y = tf.one_hot(y, OUT_CH+1, axis=0, dtype=tf.float32)
             y = y[1:, :, :, :]
 
         return (X, y)
@@ -78,15 +78,12 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
     dataset = tf.data.TFRecordDataset(path)
     dataset_len = get_dataset_len(dataset)
 
-    if repeat:
-        dataset = (dataset.map(parse_example)
-                      .repeat()
-                      .shuffle(buffer_size)
-                      .batch(batch_size))
-    else:
-        dataset = (dataset.map(parse_example)
-                      .shuffle(buffer_size)
-                      .batch(batch_size))
+    dataset = dataset.map(parse_example)
+
+    if not val:
+        dataset = dataset.shuffle(buffer_size)
+    
+    dataset = dataset.batch(batch_size)
 
     return dataset, dataset_len
 
@@ -94,14 +91,14 @@ def prepare_dataset(path, batch_size, buffer_size=1000, data_format='channels_la
 def train(args):
     # Load data.
     train_data, n_train = prepare_dataset(args.train_loc, args.batch_size,
-                                          buffer_size=100, data_format=args.data_format, repeat=False)
+                                          buffer_size=100, data_format=args.data_format, val=True)
     val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
-                                      buffer_size=50, data_format=args.data_format, repeat=False)
+                                      buffer_size=50, data_format=args.data_format, val=True)
     val_data = prepare_val_set(val_data, n_sets=args.n_val_sets,
                                 prob=args.mirror_prob, data_format=args.data_format)
     n_val *= args.n_val_sets
-    print('{} training examples.'.format(n_train))
-    print('{} validation examples.'.format(n_val))
+    print('{} training examples.'.format(n_train), flush=True)
+    print('{} validation examples.'.format(n_val), flush=True)
 
     # Initialize model.
     model = VolumetricCNN(
@@ -126,7 +123,7 @@ def train(args):
     if args.load_file:
         model.load_weights(args.load_file)
     n_params = tf.reduce_sum([tf.reduce_prod(var.shape) for var in model.trainable_variables])
-    print('Total number of parameters: {}'.format(n_params))
+    print('Total number of parameters: {}'.format(n_params), flush=True)
 
     optimizer = ScheduledAdam(learning_rate=args.lr)
 

@@ -78,6 +78,7 @@ class ConvLayer(tf.keras.layers.Layer):
         inputs = self.conv3d(inputs)
         inputs = self.norm(inputs, training=training)
         inputs = self.relu(inputs)
+        
         return inputs
 
     def get_config(self):
@@ -143,7 +144,6 @@ class ConvBlock(tf.keras.layers.Layer):
         self.se_layer = SqueezeExcitation(
                             reduction=reduction,
                             data_format=data_format)
-        self.scale = tf.keras.layers.Multiply()
         self.conv_layer1 = ConvLayer(
                                 filters=filters,
                                 kernel_size=kernel_size,
@@ -168,7 +168,7 @@ class ConvBlock(tf.keras.layers.Layer):
             { Conv3D_pointwise -> ConvLayer -> ConvLayer -> Residual }
         """
         inputs = self.conv3d_ptwise(inputs)
-        res = self.scale([self.se_layer(inputs, training=training), inputs])
+        res = self.se_layer(inputs, training=training)
         inputs = self.conv_layer1(inputs, training=training)
         inputs = self.conv_layer2(inputs, training=training)
         inputs = self.residual([res, inputs])

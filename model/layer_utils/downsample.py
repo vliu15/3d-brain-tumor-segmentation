@@ -45,9 +45,9 @@ class ConvDownsample(tf.keras.layers.Layer):
         self.relu = tf.keras.layers.Activation('relu')
 
     def __call__(self, inputs, training=None):
-        inputs = self.conv(inputs)
         inputs = self.norm(inputs, training=training)
         inputs = self.relu(inputs)
+        inputs = self.conv(inputs)
         return inputs
 
     def get_config(self):

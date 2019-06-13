@@ -57,17 +57,7 @@ class ConvEncoder(tf.keras.layers.Layer):
         # Retrieve downsampling method.
         Downsample = get_downsampling(downsampling)
 
-        # Input layers.
-        self.inp_conv = ConvLayer(
-                                filters=ENC_CONV_LAYER_SIZE,
-                                kernel_size=kernel_size,
-                                groups=groups,
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                normalization=normalization)
-
-        # First ConvBlock: filters=24, x1.
+        # First level.
         self.conv_block_0 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK0_SIZE,
                                 kernel_size=kernel_size,
@@ -86,7 +76,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 kernel_initializer=kernel_initializer,
                                 normalization=normalization)
 
-        # Second ConvBlock: filters=48, x2.
+        # Second level.
         self.conv_block_1 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK1_SIZE,
                                 kernel_size=kernel_size,
@@ -105,7 +95,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 kernel_initializer=kernel_initializer,
                                 normalization=normalization)
 
-        # Third ConvBlock: filters=96, x2.
+        # Third level.
         self.conv_block_2 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK2_SIZE,
                                 kernel_size=kernel_size,
@@ -124,7 +114,7 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 kernel_initializer=kernel_initializer,
                                 normalization=normalization)
 
-        # Fourth ConvBlock: filters=192, x4.
+        # Fourth level.
         self.conv_block_3 = [ConvBlock(
                                 filters=ENC_CONV_BLOCK3_SIZE,
                                 kernel_size=kernel_size,
@@ -136,54 +126,29 @@ class ConvEncoder(tf.keras.layers.Layer):
                                 normalization=normalization) for _ in range(ENC_CONV_BLOCK3_NUM)]
 
     def call(self, inputs, training=None):
-        """Returns the forward pass of the ConvEncoder.
-
-            {
-                Initial Conv3D_32 -> Dropout,
-                [ConvBlock_32] * 1 -> Downsample_32,
-                [ConvBlock_64] * 2 -> Downsample_64,
-                [ConvBlock_128] * 2 -> Downsample_128,
-                [ConvBlock_256] * 4
-            }
-
-            Args:
-                x: Tensor or np.ndarray
-                    The input image to the encoder.
-            Shape:
-                If data_format == 'channels_first': shape=(4, 160, 192, 128).
-                If data_format == 'channels_last': shape=(160, 192, 128, 4).
-                
-            Returns:
-                -   Outputs from ConvBlocks of filter sizes 32, 64, and 128 for
-                    residual connections in the decoder.
-                -   Output of the forward pass.
-        """
-        # Input layers.
-        inputs = self.inp_conv(inputs, training=training)
-
-        # First ConvBlock: filters=24, x1.
+        # First level.
         for conv in self.conv_block_0:
             inputs = conv(inputs, training=training)
         conv_out_0 = inputs
         inputs = self.conv_downsamp_0(inputs, training=training)
 
-        # Second ConvBlock: filters=48, x2.
+        # Second level.
         for conv in self.conv_block_1:
             inputs = conv(inputs, training=training)
         conv_out_1 = inputs
         inputs = self.conv_downsamp_1(inputs, training=training)
 
-        # Third ConvBlock: filters=96. x2.
+        # Third level.
         for conv in self.conv_block_2:
             inputs = conv(inputs, training=training)
         conv_out_2 = inputs
         inputs = self.conv_downsamp_2(inputs, training=training)
 
-        # Fourth ConvBlock: filters=192, x4.
+        # Fourth level.
         for conv in self.conv_block_3:
             inputs = conv(inputs, training=training)
 
-        # Return values after each ConvBlock for residuals later.
+        # Return values after each level for residuals later.
         return (conv_out_0, conv_out_1, conv_out_2, inputs)
 
     def get_config(self):

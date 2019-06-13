@@ -15,7 +15,6 @@ class ConvUpsample(tf.keras.layers.Layer):
                  normalization='group',
                  **kwargs):
         super(ConvUpsample, self).__init__()
-        super(ConvDownsample, self).__init__()
         self.config = super(ConvUpsample, self).get_config()
         self.config.update({'filters': filters,
                             'data_format': data_format,
@@ -44,9 +43,9 @@ class ConvUpsample(tf.keras.layers.Layer):
         self.relu = tf.keras.layers.Activation('relu')
 
     def __call__(self, inputs, training=None):
-        inputs = self.conv(inputs)
         inputs = self.norm(inputs, training=training)
         inputs = self.relu(inputs)
+        inputs = self.conv(inputs)
         return inputs
 
     def get_config(self):

@@ -46,7 +46,7 @@ def prepro_parser():
     parser.add_argument('--create_val', action='store_true', default=False,
             help='Whether to create validation split from training data.')
     parser.add_argument('--norm', type=str, default='image',
-            choices=['image', 'pixel'],
+            choices=['image', 'pixel', 'scale'],
             help='Type of normalization to apply.')
 
     args = parser.parse_args()
@@ -72,7 +72,7 @@ def train_parser():
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')
-    parser.add_argument('--mirror_prob', type=float, default=0.5,
+    parser.add_argument('--mirror_prob', type=float, default=0.0,
             help='Probability that each inputs are flipped across all 3 axes.')
     parser.add_argument('--n_val_sets', type=int, default=2,
             help='Number of unique validation sets.')
@@ -91,7 +91,7 @@ def train_parser():
                   before stopping training')
 
     # Optimization.
-    parser.add_argument('--n_epochs', type=int, default=300,
+    parser.add_argument('--n_epochs', type=int, default=150,
             help='Total number of epochs to train for.')
     parser.add_argument('--lr', type=float, default=1e-5,
             help='Initial learning rate of Adam optimizer.')

@@ -90,10 +90,6 @@ class DecoderBlock(tf.keras.layers.Layer):
                                 normalization=normalization)
 
     def call(self, inputs, training=None):
-        """Returns the forward pass of one DecoderBlock.
-
-            { Conv3D_ptwise -> Upsample3D -> Residual -> ConvBlock }
-        """
         inputs, enc_res = inputs
         inputs = self.conv3d_ptwise(inputs)
         inputs = self.upsample(inputs, training=training)
@@ -185,17 +181,8 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 upsampling=upsampling,
                                 normalization=normalization)
 
-        self.conv_out = tf.keras.layers.Conv3D(
-                                filters=DEC_CONV_LAYER_SIZE,
-                                kernel_size=kernel_size,
-                                strides=1,
-                                padding='same',
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
-
         self.ptwise_logits = tf.keras.layers.Conv3D(
-                                filters=OUT_CH-1,
+                                filters=OUT_CH,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
@@ -205,31 +192,12 @@ class ConvDecoder(tf.keras.layers.Layer):
                                 kernel_initializer=kernel_initializer)
 
     def call(self, inputs, training=None):
-        """Returns the forward pass of the ConvDecoder.
-
-            {
-                DecoderBlock_128 -> DecoderBlock_64 -> DecoderBlock_32,
-                OutputConv_32 -> LogitConv_3 + Sigmoid
-            }
-
-            Args:
-                enc_outs: (Tensor, Tensor, Tensor, Tensor)
-                    Contains residual outputs of the encoder from forward
-                    pass. Must contain (in order) the ConvBlock outputs at
-                    the 32, 64, 128, and 256 filter sizes.
-
-            Returns:
-                x: Tensor
-                    Output 'image' the same size as the original input image
-                    to the encoder, but with 3 channels.
-        """
         enc_out_0, enc_out_1, enc_out_2, inputs = inputs
 
         inputs = self.dec_block_2((inputs, enc_out_2), training=training)
         inputs = self.dec_block_1((inputs, enc_out_1), training=training)
         inputs = self.dec_block_0((inputs, enc_out_0), training=training)
 
-        inputs = self.conv_out(inputs)
         inputs = self.ptwise_logits(inputs)
 
         return inputs

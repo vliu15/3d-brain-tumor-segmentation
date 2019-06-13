@@ -72,11 +72,11 @@ def image_norm(X_train, data_format='channels_last'):
         voxel_std[i] = np.std(channel[channel != 0])
 
     if data_format == 'channels_last':
-        voxel_mean = voxel_mean.reshape(1, 1, 1, voxel_mean.shape[0])
-        voxel_std = voxel_std.reshape(1, 1, 1, voxel_std.shape[0])
+        voxel_mean = voxel_mean.reshape(1, 1, 1, -1)
+        voxel_std = voxel_std.reshape(1, 1, 1, -1)
     else:
-        voxel_mean = voxel_mean.reshape(voxel_mean.shape[0], 1, 1, 1)
-        voxel_std = voxel_std.reshape(voxel_std.shape[0], 1, 1, 1)
+        voxel_mean = voxel_mean.reshape(-1, 1, 1, 1)
+        voxel_std = voxel_std.reshape(-1, 1, 1, 1)
 
     return voxel_mean, voxel_std
 
@@ -96,6 +96,26 @@ def pixel_norm(X_train, data_format='channels_last'):
                     elif data_format == 'channels_first':
                         voxel_mean[c, h, w, d] = X[:, c, h, w, d].mean()
                         voxel_std[c, h, w, d] = X[:, c, h, w, d].std()
+
+    return voxel_mean, voxel_std
+
+
+def scale_norm(X_train, data_format='channels_last'):
+    """Returns maximum and minimum number per channel."""
+    voxel_mean = np.array([float('inf')] * IN_CH)
+    voxel_std = np.array([-float('inf')] * IN_CH)
+    axis = (0, 1, 2) if data_format == 'channels_last' else (1, 2, 3)
+
+    for i in range(X_train.shape[0]):
+        voxel_mean = np.minimum(voxel_mean, np.amin(X_train[i], axis=axis))
+        voxel_std = np.maximum(voxel_std, np.amax(X_train[i], axis=axis))
+
+    if data_format == 'channels_last':
+        voxel_mean = voxel_mean.reshape(1, 1, 1, -1)
+        voxel_std = voxel_std.reshape(1, 1, 1, -1)
+    else:
+        voxel_mean = voxel_mean.reshape(-1, 1, 1, 1)
+        voxel_std = voxel_std.reshape(-1, 1, 1, 1)
 
     return voxel_mean, voxel_std
 
@@ -145,6 +165,9 @@ def main(args):
     elif args.norm == 'pixel':
         print('Apply pixel-wise normalization per channel.')
         voxel_mean, voxel_std = pixel_norm(X_train, data_format=args.data_format)
+    elif args.norm == 'scale':
+        print('Normalize all values to [0, 1] per channel.')
+        voxel_mean, voxel_std = scale_norm(X_train, data_format=args.data_format)
 
     np.save(os.path.join(args.out_folder, '{}_mean_std.npy'.format(args.norm)),
             {'mean': voxel_mean, 'std': voxel_std})
