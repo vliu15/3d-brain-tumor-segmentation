@@ -10,7 +10,7 @@ import random
 
 from utils.arg_parser import test_parser
 from utils.constants import *
-from model.volumetric_cnn import VolumetricCNN
+from model.model import VolumetricCNN
 
 
 class Interpolator(object):

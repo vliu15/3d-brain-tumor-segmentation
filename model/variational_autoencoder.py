@@ -1,10 +1,9 @@
 """Contains custom variational autoencoder class."""
 import tensorflow as tf
 
-from model.layer_utils.group_norm import GroupNormalization
 from model.layer_utils.downsample import get_downsampling
 from model.layer_utils.upsample import get_upsampling
-from model.resnet_block import ConvBlock, ConvLayer
+from model.layer_utils.resnet import ResnetBlock
 from utils.constants import *
 
 
@@ -80,7 +79,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                         groups=groups,
                         data_format=data_format,
                         l2_scale=l2_scale)
-            conv = ConvBlock(
+            conv = ResnetBlock(
                         filters=base_filters*(2**i),
                         groups=groups,
                         reduction=reduction,

@@ -45,7 +45,7 @@ class ConvLayer(tf.keras.layers.Layer):
         return self.config
 
 
-class ConvBlock(tf.keras.layers.Layer):
+class ResnetBlock(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
                  data_format='channels_last',
@@ -58,9 +58,9 @@ class ConvBlock(tf.keras.layers.Layer):
             References:
                 - [Deep Residual Learning for Image Recognition](https://arxiv.org/pdf/1512.03385.pdf)
         """
-        super(ConvBlock, self).__init__()
+        super(ResnetBlock, self).__init__()
         # Set up config for self.get_config() to serialize later.
-        self.config = super(ConvBlock, self).get_config()
+        self.config = super(ResnetBlock, self).get_config()
         self.config.update({'filters': filters,
                             'data_format': data_format,
                             'groups': groups,

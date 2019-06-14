@@ -1,11 +1,11 @@
 """Contains custom convolutional encoder class."""
 import tensorflow as tf
 
-from model.resnet_block import ConvBlock, ConvLayer
+from model.layer_utils.resnet import ResnetBlock
 from model.layer_utils.downsample import get_downsampling
 
 
-class ConvEncoder(tf.keras.layers.Layer):
+class Encoder(tf.keras.layers.Layer):
     def __init__(self,
                  data_format='channels_last',
                  groups=8,
@@ -15,11 +15,14 @@ class ConvEncoder(tf.keras.layers.Layer):
                  base_filters=16,
                  depth=4):
         """ Initializes the model encoder: consists of an alternating
-            series of SENet blocks and downsampling layers.
+            series of ResNet blocks with DenseNet connections and downsampling layers.
+
+            References:
+                - [Densely Connected Residual Networks](https://arxiv.org/pdf/1608.06993.pdf)
         """
-        super(ConvEncoder, self).__init__()
+        super(Encoder, self).__init__()
         # Set up config for self.get_config() to serialize later.
-        self.config = super(ConvEncoder, self).get_config()
+        self.config = super(Encoder, self).get_config()
         self.config.update({'data_format': data_format,
                             'groups': groups,
                             'reduction': reduction,
@@ -34,12 +37,15 @@ class ConvEncoder(tf.keras.layers.Layer):
         # Build layers at all spatial levels.
         self.levels = []
         for i in range(depth):
-            convs = [ConvBlock(
+            convs = [[ResnetBlock(
                             filters=base_filters*(2**i),
                             groups=groups,
                             reduction=reduction,
                             data_format=data_format,
-                            l2_scale=l2_scale) for _ in range(2)]
+                            l2_scale=l2_scale),
+                      tf.keras.layers.Concatenate(
+                            axis=-1 if data_format == 'channels_last' else 1)]
+                     for _ in range(2)]
 
             # No downsampling at deepest spatial level.
             if i < depth:
@@ -60,9 +66,15 @@ class ConvEncoder(tf.keras.layers.Layer):
             convs = level[:-1]
             downsample = level[-1]
 
+            # Cache intermediate activations for dense connections.
+            cache = []
+
             # Iterate through convolutional blocks.
-            for conv in convs:
+            for conv, res in convs:
+                if cache:
+                    inputs = res([inputs] + cache)
                 inputs = conv(inputs, training=training)
+                cache.append(inputs)
             
             # Store residuals for use in decoder.
             residuals.append(inputs)

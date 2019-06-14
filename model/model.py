@@ -1,8 +1,8 @@
 """Contains custom models for 3D semantic segmentation."""
 import tensorflow as tf
 
-from model.encoder import ConvEncoder
-from model.decoder import ConvDecoder
+from model.encoder import Encoder
+from model.decoder import Decoder
 from model.variational_autoencoder import VariationalAutoencoder
 
 
@@ -25,7 +25,7 @@ class VolumetricCNN(tf.keras.models.Model):
         """
         super(VolumetricCNN, self).__init__()
         self.epoch = tf.Variable(0, name='epoch', trainable=False)
-        self.encoder = ConvEncoder(
+        self.encoder = Encoder(
                             data_format=data_format,
                             groups=groups,
                             reduction=reduction,
@@ -33,7 +33,7 @@ class VolumetricCNN(tf.keras.models.Model):
                             downsampling=downsampling,
                             base_filters=base_filters,
                             depth=depth)
-        self.decoder = ConvDecoder(
+        self.decoder = Decoder(
                             data_format=data_format,
                             groups=groups,
                             reduction=reduction,

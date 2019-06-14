@@ -18,7 +18,7 @@ We adopt the encoder-decoder convolutional architecture described in the [above 
 ## Usage
 Dependencies are only supported for Python3 and can be found in `requirements.txt`. We use `numpy==1.15` for the bulk of preprocessing and `tensorflow==2.0.0-alpha0` for the model architecture, utilizing `tf.keras.Model` and `tf.keras.Layer` subclassing.
 
-The `VolumetricCNN` model can be found in `model/volumetric_cnn.py` and contains an `inference` mode in addition to the `training` mode that `tf.Keras.Model` supports.
+The `VolumetricCNN` model can be found in `model/model.py` and contains an `inference` mode in addition to the `training` mode that `tf.Keras.Model` supports.
  - Specify `training=False, inference=True` to only receive the decoder output, as desired in test time.
  - Specify `training=False, inference=False` to receive both the decoder and variational autoencoder output to be able to run loss and metrics, as desired in validation time.
 

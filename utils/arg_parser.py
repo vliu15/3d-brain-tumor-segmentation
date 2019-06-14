@@ -5,7 +5,7 @@ import os
 
 def add_model_args(parser):
     # Architectural
-    parser.add_argument('--base_filters', type=int, default=32,
+    parser.add_argument('--base_filters', type=int, default=16,
             help='Number of filters in input/output layers.')
     parser.add_argument('--depth', type=int, default=4,
             help='Number of spatial levels thorughout network.')
@@ -79,6 +79,8 @@ def train_parser():
             help='File path to save best checkpoint.')
     parser.add_argument('--load_file', type=str, default='',
             help='File path to load complete checkpoint.')
+    parser.add_argument('--arch_file', type=str, default='model.png',
+            help='File path to save model visualization.')
     parser.add_argument('--log_steps', type=int, default=-1,
             help='Frequency at which to output training statistics.')
     parser.add_argument('--patience', type=int, default=10,

@@ -1,16 +1,14 @@
 """Initializes the model module."""
-import model.resnet_block
 import model.encoder
 import model.decoder
 import model.variational_autoencoder
-import model.volumetric_cnn
+import model.model
 
 from model.layer_utils import *
 
 
-__all__ = [model.resnet_block,
-           model.encoder,
+__all__ = [model.encoder,
            model.decoder,
            model.variational_autoencoder,
-           model.volumetric_cnn,
+           model.model,
            model.layer_utils]

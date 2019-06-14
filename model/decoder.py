@@ -1,12 +1,12 @@
 """Contains custom convolutional decoder class."""
 import tensorflow as tf
 
-from model.resnet_block import ConvBlock
+from model.layer_utils.resnet import ResnetBlock
 from model.layer_utils.upsample import get_upsampling
 from utils.constants import OUT_CH
 
 
-class ConvDecoder(tf.keras.layers.Layer):
+class Decoder(tf.keras.layers.Layer):
     def __init__(self,
                  data_format='channels_last',
                  groups=8,
@@ -18,14 +18,16 @@ class ConvDecoder(tf.keras.layers.Layer):
         """ Initializes the model decoder: consists of an alternating
             series of SENet blocks and upsampling layers.
         """
-        super(ConvDecoder, self).__init__()
+        super(Decoder, self).__init__()
         # Set up config for self.get_config() to serialize later.
-        self.config = super(ConvDecoder, self).get_config()
+        self.config = super(Decoder, self).get_config()
         self.config.update({'data_format': data_format,
                             'groups': groups,
                             'reduction': reduction,
                             'l2_scale': l2_scale,
-                            'upsampling': upsampling})
+                            'upsampling': upsampling,
+                            'base_filters': base_filters,
+                            'depth': depth})
 
         # Retrieve upsampling method.
         Upsample = get_upsampling(upsampling)
@@ -34,18 +36,19 @@ class ConvDecoder(tf.keras.layers.Layer):
         self.levels = []
         for i in range(depth-2, -1, -1):
             upsample = Upsample(
-                        filters=base_filters*(2**i),
-                        groups=groups,
-                        data_format=data_format,
-                        l2_scale=l2_scale)
-            res = tf.keras.layers.Add()
-            convs = [ConvBlock(
-                        filters=base_filters*(2**i),
-                        groups=groups,
-                        reduction=reduction,
-                        data_format=data_format,
-                        l2_scale=l2_scale) for _ in range(1)]
-            self.levels.append([upsample, res, convs])
+                            filters=base_filters*(2**i),
+                            groups=groups,
+                            data_format=data_format,
+                            l2_scale=l2_scale)
+            res = tf.keras.layers.Concatenate(
+                            axis=-1 if data_format == 'channels_last' else 1)
+            conv = ResnetBlock(
+                            filters=base_filters*(2**i),
+                            groups=groups,
+                            reduction=reduction,
+                            data_format=data_format,
+                            l2_scale=l2_scale)
+            self.levels.append([upsample, res, conv])
 
         # Output layer convolution.
         self.out_conv = tf.keras.layers.Conv3D(
@@ -62,17 +65,16 @@ class ConvDecoder(tf.keras.layers.Layer):
         inputs, residuals = inputs
         # Iterate through spatial levels.
         for level, residual in zip(self.levels, residuals[::-1]):
-            upsample, res, convs = level
+            upsample, res, conv = level
 
             # Upsample.
             inputs = upsample(inputs, training=training)
 
-            # Add residual from encoder.
+            # Combine with residual from encoder.
             inputs = res([residual, inputs])
 
-            # Iterate through convolutional blocks.
-            for conv in convs:
-                inputs = conv(inputs, training=training)
+            # Pass through convolutional block.
+            inputs = conv(inputs, training=training)
 
         # Map convolution to number of classes.
         inputs = self.out_conv(inputs)

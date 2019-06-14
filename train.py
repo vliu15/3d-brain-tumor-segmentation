@@ -8,7 +8,7 @@ from utils.losses import DiceLoss, CustomLoss
 from utils.metrics import DiceCoefficient, HausdorffDistance
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
-from model.volumetric_cnn import VolumetricCNN
+from model.model import VolumetricCNN
 
 
 def prepare_batch(X, y, prob=0.5, data_format='channels_last'):
@@ -96,7 +96,7 @@ def train(args):
 
     # Load data.
     train_data, n_train = prepare_dataset(args.train_loc, args.batch_size,
-                                          (prepro_h, prepro_w, prepro_d), buffer_size=0,
+                                          (prepro_h, prepro_w, prepro_d), buffer_size=260,
                                           data_format=args.data_format)
     val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
                                       (prepro_h, prepro_w, prepro_d), buffer_size=0,
@@ -122,6 +122,16 @@ def train(args):
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
                                     else (1, IN_CH, H, W, D)))
+
+    # Save model visualization if specified.
+    if args.arch_file:
+        tf.keras.utils.plot_model(
+                model,
+                to_file=args.arch_file,
+                show_shapes=True,
+                show_layer_names=False,
+                rankdir='LR')
+    return
 
     # Get starting epoch.
     start_epoch = model.epoch.value().numpy()
