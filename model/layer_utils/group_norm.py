@@ -20,32 +20,10 @@ class GroupNormalization(tf.keras.layers.Layer):
                  beta_constraint=None,
                  gamma_constraint=None,
                  **kwargs):
-        """[Group Normalization](https://arxiv.org/abs/1803.08494)
+        """ Initializes one group normalization layer.
 
-            Args:
-                groups: int, optional
-                    Number of groups for Group Normalization.
-                axis: int, optional
-                    The axis that should be normalized (typically the
-                    features axis).
-                center: bool, optional
-                    Whether to add an offset parameter.
-                scale: bool, optional
-                    Whether to add a scale parameter.
-                epsilon: float, optional
-                    Epsilon for calculating variance.
-                gamma_initializer: str / tf.keras.initializer, optional
-                    Initializer for the gamma weight.
-                beta_initializer: str / tf.keras.initializer, optional
-                    Initializer for the beta weight.
-                gamma_regularizer: str / tf.keras.regularizer, optional
-                    Regularizer for the gamma weight.
-                beta_regularizer: str / tf.keras.regularizer, optional
-                    Regularizer for the beta weight.
-                gamma_constraint: str / tf.keras.constraint, optional
-                    Constraint for the gamma weight.
-                beta_constraint: str / tf.keras.constraint, optional
-                    Constraint for the beta weight.
+            References:
+                - [Group Normalization](https://arxiv.org/abs/1803.08494)
         """
         super(GroupNormalization, self).__init__(**kwargs)
         self.supports_masking = True

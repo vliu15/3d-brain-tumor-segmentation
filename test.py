@@ -202,105 +202,11 @@ def dice_coefficient(y_true, y_pred, eps=1.0):
     return dice_macro, dice_micro
 
 
-def prepare_image(X, voxel_mean, voxel_std, data_format):
-    """Normalize image and sample crops to represent whole input."""
-    # Expand batch dimension and normalize.
-    X = (X - voxel_mean) / voxel_std
-
-    # Crop to size.
-    if data_format == 'channels_last':
-        crop1 = X[:H, :W, :D, :]
-        crop2 = X[-H:, :W, :D, :]
-        crop3 = X[:H, -W:, :D, :]
-        crop4 = X[-H:, -W:, :D, :]
-        crop5 = X[:H, :W, -D:, :]
-        crop6 = X[-H:, :W, -D:, :]
-        crop7 = X[:H, -W:, -D:, :]
-        crop8 = X[-H:, -W:, -D:, :]
-    elif data_format == 'channels_first':
-        crop1 = X[:, :H, :W, :D]
-        crop2 = X[:, -H:, :W, :D]
-        crop3 = X[:, :H, -W:, :D]
-        crop4 = X[:, -H:, -W:, :D]
-        crop5 = X[:, :H, :W, -D:]
-        crop6 = X[:, -H:, :W, -D:]
-        crop7 = X[:, :H, -W:, -D:]
-        crop8 = X[:, -H:, -W:, -D:]
-        
-    return np.stack([crop1, crop2, crop3, crop4, crop5, crop6, crop7, crop8], axis=0)
-
-
-def create_mask(y, data_format):
-    def merge_h(h1, h2):
-        if data_format == 'channels_last':
-            return tf.concat([h1[:-h_overlap, :, :, :],
-                              tf.minimum(h1[-h_overlap:, :, :, :], h2[:h_overlap, :, :, :]),
-                              h2[h_overlap:, :, :, :]], axis=0)
-        elif data_format == 'channels_first':
-            return tf.concat([h1[:, :-h_overlap, :, :],
-                              tf.minimum(h1[:, -h_overlap:, :, :], h2[:, :h_overlap, :, :]),
-                              h2[:, h_overlap:, :, :]], axis=1)
-
-    def merge_w(w1, w2):
-        if data_format == 'channels_last':
-            return tf.concat([w1[:, :-w_overlap, :, :],
-                              tf.minimum(w1[:, -w_overlap:, :, :], w2[:, :w_overlap, :, :]),
-                              w2[:, w_overlap:, :, :]], axis=1)
-        elif data_format == 'channels_first':
-            return tf.concat([w1[:, :, :-w_overlap, :],
-                              tf.minimum(w1[:, :, -w_overlap:, :], w2[:, :, :w_overlap, :]),
-                              w2[:, :, w_overlap:, :]], axis=2)
-
-    def merge_d(d1, d2):
-        if data_format == 'channels_last':
-            return tf.concat([d1[:, :, :-d_overlap, :],
-                              tf.minimum(d1[:, :, -d_overlap:, :], d2[:, :, :d_overlap, :]),
-                              d2[:, :, d_overlap:, :]], axis=2)
-        elif data_format == 'channels_first':
-            return tf.concat([d1[:, :, :, :-d_overlap],
-                              tf.minimum(d1[:, :, :, -d_overlap:], d2[:, :, :, :d_overlap]),
-                              d2[:, :, :, d_overlap:]], axis=-1)
-
-    crop1, crop2, crop3, crop4, crop5, crop6, crop7, crop8 = [y[i, ...] for i in range(8)]
-
-    # Calculate region of overlap.
-    h_overlap = 2 * H - RAW_H
-    w_overlap = 2 * W - RAW_W
-    d_overlap = 2 * D - RAW_D
-
-    h1 = merge_h(crop1, crop2)
-    h2 = merge_h(crop3, crop4)
-    h3 = merge_h(crop5, crop6)
-    h4 = merge_h(crop7, crop8)
-
-    w1 = merge_w(h1, h2)
-    w2 = merge_w(h3, h4)
-
-    d1 = merge_d(w1, w2)
-
-    axis = -1 if data_format == 'channels_last' else 0
-
-    # Mask out values that correspond to values < 0.5.
-    mask = tf.reduce_max(d1, axis=axis)
-    mask = tf.cast(mask > 0.5, tf.int32)
-
-    # Take the argmax to determine label.
-    seg_mask = tf.argmax(d1, axis=axis, output_type=tf.int32)
-
-    # Convert [0, 1, 2] to [1, 2, 3] for consistency.
-    seg_mask += 1
-
-    # Mask out values that correspond to <0.5 probability.
-    seg_mask *= mask
-
-    return seg_mask
-
-
 def main(args):
     # Initialize.
-    data = np.load(args.prepro_file)
-    voxel_mean = tf.convert_to_tensor(data.item()['mean'], dtype=tf.float32)
-    voxel_std = tf.convert_to_tensor(data.item()['std'], dtype=tf.float32)
+    data = np.load(args.prepro_file).item()
+    voxel_mean = tf.convert_to_tensor(data['mean'], dtype=tf.float32)
+    voxel_std = tf.convert_to_tensor(data['std'], dtype=tf.float32)
     
     # Initialize model.
     model = VolumetricCNN(
@@ -359,11 +265,6 @@ def main(args):
 
             # Create mask.
             y_pred = segmentor.create_mask(y_pred)
-
-            # X = prepare_image(X, voxel_mean, voxel_std, args.data_format)
-            # y_pred, *_ = model(X, training=False, inference=True)
-            # y_pred = create_mask(y_pred, args.data_format).numpy()
-            # np.place(y_pred, y_pred >= 3, [4])
 
             # If label is available, score the prediction.
             if y is not None:

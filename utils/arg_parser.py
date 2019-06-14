@@ -5,28 +5,24 @@ import os
 
 def add_model_args(parser):
     # Architectural
-    parser.add_argument('--downsamp', type=str, default='max',
-            choices=['max', 'avg', 'conv'],
+    parser.add_argument('--base_filters', type=int, default=32,
+            help='Number of filters in input/output layers.')
+    parser.add_argument('--depth', type=int, default=4,
+            help='Number of spatial levels thorughout network.')
+    parser.add_argument('--downsamp', type=str, default='conv',
+            choices=['max', 'conv'],
             help='Method of downsampling.')
-    parser.add_argument('--upsamp', type=str, default='linear',
+    parser.add_argument('--upsamp', type=str, default='conv',
             choices=['linear', 'conv'],
             help='Method of upsampling.')
-    parser.add_argument('--norm', type=str, default='group',
-            choices=['group', 'batch', 'layer'],
-            help='Which normalization to use throughout the network.')
     
     # Parameters
-    parser.add_argument('--conv_kernel_size', type=int, default=3,
-            help='Size of convolutional kernels throughout the model.')
     parser.add_argument('--gn_groups', type=int, default=8,
             help='Size of groups for group normalization.')
-    parser.add_argument('--se_reduction', type=int, default=2,
+    parser.add_argument('--se_reduction', type=int, default=4,
             help='Reduction ratio in excitation layers of SENet blocks.')
     parser.add_argument('--l2_scale', type=float, default=1e-5,
             help='Scale of L2-regularization for convolution kernel weights.')
-    parser.add_argument('--kernel_init', type=str, default='he_normal',
-            choices=['he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform'],
-            help='Kernel initialization to use for weight initialization.')
     return parser
 
 
@@ -38,9 +34,6 @@ def prepro_parser():
             help='Location of unzipped BraTS data.')
     parser.add_argument('--out_folder', type=str, default='./data',
             help='Location to write preprocessed data.')
-    parser.add_argument('--data_format', type=str, default='channels_last',
-            choices=['channels_last', 'channels_first'],
-            help='Format of preprocessed data: `channels_last` or `channels_first`.')
 
     # Preprocessing.
     parser.add_argument('--create_val', action='store_true', default=False,
@@ -69,6 +62,8 @@ def train_parser():
             help='Location of preprocessed training data.')
     parser.add_argument('--val_loc', type=str, required=True,
             help='Location of preprocessed validation data.')
+    parser.add_argument('--prepro_loc', type=str, required=True,
+            help='Location of preprocessed statistics.')
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')
@@ -93,7 +88,7 @@ def train_parser():
     # Optimization.
     parser.add_argument('--n_epochs', type=int, default=150,
             help='Total number of epochs to train for.')
-    parser.add_argument('--lr', type=float, default=1e-5,
+    parser.add_argument('--lr', type=float, default=1e-4,
             help='Initial learning rate of Adam optimizer.')
     parser.add_argument('--warmup_epochs', type=int, default=10,
             help='Number of epochs for learning rate warmup.')
@@ -126,9 +121,6 @@ def test_parser():
     # Data.
     parser.add_argument('--test_folder', type=str, required=True,
             help='Location of test set data.')
-    parser.add_argument('--data_format', type=str, default='channels_last',
-            choices=['channels_first', 'channels_last'],
-            help='Format of input data: `channel_first` or `channels_last`.')
 
     # Segmentation.
     parser.add_argument('--threshold', type=float, default=0.5,

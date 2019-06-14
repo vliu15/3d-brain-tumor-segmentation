@@ -8,7 +8,7 @@ from tqdm import tqdm
 import tensorflow as tf
 
 from utils.arg_parser import prepro_parser
-from utils.constants import *
+from utils.constants import BRATS_MODALITIES, TRUTH, IN_CH, RAW_H, RAW_W, RAW_D
 
 
 def get_npy_image(subject_folder, name):
@@ -19,29 +19,54 @@ def get_npy_image(subject_folder, name):
     return np.array(nib.load(file_card).dataobj).astype(np.float32)
 
 
-def create_dataset(brats_folder, data_format='channels_last'):
+def create_dataset(brats_folder):
     """Returns lists of data inputs and labels."""
     X = []
     y = []
+
+    h_min, h_max = RAW_H - 1, 0
+    w_min, w_max = RAW_W - 1, 0
+    d_min, d_max = RAW_D - 1, 0
     # Loop through each folder with `.nii.gz` files.
     for subject_folder in tqdm(glob.glob(os.path.join(brats_folder, '*', '*')), desc='Load data    '):
 
         # Create corresponding output folder.
         if os.path.isdir(subject_folder):
-            axis = -1 if data_format == 'channels_last' else 0
-
             # Stack modalities in channel dimension.
-            X_example = np.stack(
-                [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=axis)
+            X_ = np.stack(
+                [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=-1)
 
             # Replace label 4 with 3 for softmax labels at output time.
-            y_example = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=axis)
-            np.place(y_example, y_example >= 4, [3])
+            y_ = np.expand_dims(get_npy_image(subject_folder, TRUTH), axis=-1)
+            np.place(y_, y_ >= 4, [3])
 
-        X.append(X_example)
-        y.append(y_example)
+            # Determine smallest bounding box.
+            h_min_, h_max_ = np.where(np.any(X_, axis=(1, 2, -1)))[0][[0, -1]]
+            h_min = min(h_min, h_min_)
+            h_max = max(h_max, h_max_)
 
-    return X, y
+            w_min_, w_max_ = np.where(np.any(X_, axis=(0, 2, -1)))[0][[0, -1]]
+            w_min = min(w_min, w_min_)
+            w_max = max(w_max, w_max_)
+
+            d_min_, d_max_ = np.where(np.any(X_, axis=(0, 1, -1)))[0][[0, -1]]
+            d_min = min(d_min, d_min_)
+            d_max = max(d_max, d_max_)
+
+            X.append(X_)
+            y.append(y_)
+
+    # Crop to minimal size for all examples.
+    X = [X_[h_min:h_max, w_min:w_max, d_min:d_max, :] for X_ in X]
+    y = [y_[h_min:h_max, w_min:w_max, d_min:d_max, :] for y_ in y]
+
+    print('Maximal crop size: [{}, {}, {}, 2]'.format(h_max-h_min-1, w_max-w_min-1, d_max-d_min-1))
+
+    crop_indices = {'h_min': h_min, 'h_max': h_max, 
+                    'w_min': w_min, 'w_max': w_max,
+                    'd_min': d_min, 'd_max': d_max}
+
+    return X, y, crop_indices
 
 
 def create_splits(X, y):
@@ -56,66 +81,47 @@ def create_splits(X, y):
     X = np.stack(X, axis=0)
     y = np.stack(y, axis=0)
 
-    return X[split:], y[split:], X[:split], y[:split]
+    return (X[split:], y[split:]), (X[:split], y[:split])
 
 
-def image_norm(X_train, data_format='channels_last'):
+def image_norm(X_train):
     """Returns image-wise mean and standard deviation per channel."""
-    transpose_order = (4, 0, 1, 2, 3) if data_format == 'channels_last' else (1, 0, 2, 3, 4)
-    X_train = X_train.transpose(*transpose_order).reshape(IN_CH, -1)
+    X_train = X_train.transpose(4, 0, 1, 2, 3).reshape(IN_CH, -1)
 
     # Compute mean and std for each channel.
-    voxel_mean = np.zeros(IN_CH)
-    voxel_std = np.zeros(IN_CH)
+    voxel_mean = np.zeros((1, 1, 1, IN_CH))
+    voxel_std = np.zeros((1, 1, 1, IN_CH))
     for i, channel in tqdm(enumerate(X_train)):
-        voxel_mean[i] = np.mean(channel[channel != 0])
-        voxel_std[i] = np.std(channel[channel != 0])
-
-    if data_format == 'channels_last':
-        voxel_mean = voxel_mean.reshape(1, 1, 1, -1)
-        voxel_std = voxel_std.reshape(1, 1, 1, -1)
-    else:
-        voxel_mean = voxel_mean.reshape(-1, 1, 1, 1)
-        voxel_std = voxel_std.reshape(-1, 1, 1, 1)
+        voxel_mean[..., i] = np.mean(channel[channel != 0])
+        voxel_std[..., i] = np.std(channel[channel != 0])
 
     return voxel_mean, voxel_std
 
 
-def pixel_norm(X_train, data_format='channels_last'):
+def pixel_norm(X_train):
     """Returns pixel-wise mean and standard deviation per channel."""
     # Compute mean and std for each position.
     voxel_mean = np.zeros_like(X_train[0])
     voxel_std = np.zeros_like(X_train[0])
-    for h in range(H):
-        for w in range(W):
-            for d in range(D):
-                for c in range(IN_CH):
-                    if data_format == 'channels_last':
-                        voxel_mean[h, w, d, c] = X[:, h, w, d, c].mean()
-                        voxel_std[h, w, d, c] = X[:, h, w, d, c].std()
-                    elif data_format == 'channels_first':
-                        voxel_mean[c, h, w, d] = X[:, c, h, w, d].mean()
-                        voxel_std[c, h, w, d] = X[:, c, h, w, d].std()
+    H_, W_, D_, C_ = X_train[0].shape
+    for h in range(H_):
+        for w in range(W_):
+            for d in range(D_):
+                for c in range(C_):
+                    voxel_mean[h, w, d, c] = np.mean(X[:, h, w, d, c])
+                    voxel_std[h, w, d, c] = np.std(X[:, h, w, d, c])
 
     return voxel_mean, voxel_std
 
 
-def scale_norm(X_train, data_format='channels_last'):
+def scale_norm(X_train):
     """Returns maximum and minimum number per channel."""
-    voxel_mean = np.array([float('inf')] * IN_CH)
-    voxel_std = np.array([-float('inf')] * IN_CH)
-    axis = (0, 1, 2) if data_format == 'channels_last' else (1, 2, 3)
+    voxel_mean = float('inf') * np.ones((1, 1, 1, IN_CH))
+    voxel_std = -float('inf') * np.ones((1, 1, 1, IN_CH))
 
     for i in range(X_train.shape[0]):
-        voxel_mean = np.minimum(voxel_mean, np.amin(X_train[i], axis=axis))
-        voxel_std = np.maximum(voxel_std, np.amax(X_train[i], axis=axis))
-
-    if data_format == 'channels_last':
-        voxel_mean = voxel_mean.reshape(1, 1, 1, -1)
-        voxel_std = voxel_std.reshape(1, 1, 1, -1)
-    else:
-        voxel_mean = voxel_mean.reshape(-1, 1, 1, 1)
-        voxel_std = voxel_std.reshape(-1, 1, 1, 1)
+        voxel_mean = np.minimum(voxel_mean, np.amin(X_train[i], axis=(0, 1, 2)))
+        voxel_std = np.maximum(voxel_std, np.amax(X_train[i], axis=(0, 1, 2)))
 
     return voxel_mean, voxel_std
 
@@ -123,7 +129,8 @@ def scale_norm(X_train, data_format='channels_last'):
 def normalize(voxel_mean, voxel_std, X):
     """Normalizes an array of features X given voxel-wise mean and std."""
     for i in tqdm(range(X.shape[0]), desc='Normalize    '):
-        X[i] = (X[i] - voxel_mean) / (voxel_std + 1e-8)
+        np.place(voxel_std, voxel_std <= 0, [1])
+        X[i] = (X[i] - voxel_mean) / (voxel_std + 1e-7)
 
     return X
 
@@ -132,8 +139,8 @@ def example_to_tfrecords(X, y, writer):
     """Writes one (X, y) example to tf.TFRecord file."""
     example = {
         'X': tf.train.Feature(float_list=tf.train.FloatList(value=X.flatten())),
-        'y': tf.train.Feature(float_list=tf.train.FloatList(value=y.flatten()))
-    }
+        'y': tf.train.Feature(float_list=tf.train.FloatList(value=y.flatten()))}
+
     example = tf.train.Features(feature=example)
     example = tf.train.Example(features=example)
     writer.write(example.SerializeToString())
@@ -142,35 +149,29 @@ def example_to_tfrecords(X, y, writer):
 def main(args):
     # Convert .nii.gz data files to a list Tensors.
     print('Convert data to Numpy arrays.')
-    X_train, y_train = create_dataset(args.brats_folder, data_format=args.data_format)
+    X_train, y_train, prepro_stats = create_dataset(args.brats_folder)
 
     # Create dataset splits (if necessary).
     if args.create_val:
         print('Create train / val splits.')
-        X_train, y_train, X_val, y_val = create_splits(X_train, y_train)
-        print('X_train shape: {}.'.format(X_train.shape))
-        print('y_train shape: {}.'.format(y_train.shape))
-        print('X_val shape: {}.'.format(X_val.shape))
-        print('y_val shape: {}.'.format(y_val.shape))
+        (X_train, y_train), (X_val, y_val) = create_splits(X_train, y_train)
     else:
         X_train = np.stack(X_train, axis=0)
         y_train = np.stack(y_train, axis=0)
-        print('X_train shape: {}.'.format(X_train.shape))
-        print('y_train shape: {}.'.format(y_train.shape))
 
     # Normalize training and validation data.
     if args.norm == 'image':
         print('Apply image-wise normalization per channel.')
-        voxel_mean, voxel_std = image_norm(X_train, data_format=args.data_format)
+        voxel_mean, voxel_std = image_norm(X_train)
     elif args.norm == 'pixel':
         print('Apply pixel-wise normalization per channel.')
-        voxel_mean, voxel_std = pixel_norm(X_train, data_format=args.data_format)
+        voxel_mean, voxel_std = pixel_norm(X_train)
     elif args.norm == 'scale':
         print('Normalize all values to [0, 1] per channel.')
-        voxel_mean, voxel_std = scale_norm(X_train, data_format=args.data_format)
+        voxel_mean, voxel_std = scale_norm(X_train)
 
-    np.save(os.path.join(args.out_folder, '{}_mean_std.npy'.format(args.norm)),
-            {'mean': voxel_mean, 'std': voxel_std})
+    prepro_stats.update({'mean': voxel_mean, 'std': voxel_std})
+    np.save(os.path.join(args.out_folder, '{}_mean_std.npy'.format(args.norm)), prepro_stats)
 
     # Save normalized training data.
     print('Save training set.')

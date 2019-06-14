@@ -2,108 +2,17 @@
 import tensorflow as tf
 
 from model.layer_utils.group_norm import GroupNormalization
-from model.layer_utils.getters import get_downsampling, get_upsampling
+from model.layer_utils.downsample import get_downsampling
+from model.layer_utils.upsample import get_upsampling
 from model.resnet_block import ConvBlock, ConvLayer
 from utils.constants import *
 
 
-def sample(latent_args):
+def sample(inputs):
     """Samples from the Gaussian given by mean and variance."""
-    z_mean, z_logvar = latent_args
+    z_mean, z_logvar = inputs
     eps = tf.random.normal(shape=z_mean.shape, dtype=tf.float32)
     return z_mean + tf.math.exp(0.5 * z_logvar) * eps
-
-
-class VariationalAutoencoderBlock(tf.keras.layers.Layer):
-    def __init__(self,
-                 filters,
-                 kernel_size=3,
-                 reduction=2,
-                 data_format='channels_last',
-                 groups=8,
-                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer='he_normal',
-                 upsampling='linear',
-                 normalization='group'):
-        """Initializes a variational autoencoder block.
-
-            See https://arxiv.org/pdf/1810.11654.pdf for more details.
-            Similar to a decoder block, a variational autoencoder block
-            consists of pointwise convolution, upsampling, and a conv
-            block. There is no residual passed through from the encoder
-            in this branch of the network.
-
-            Args:
-                filters: int
-                    The number of filters to use in the 3D convolutional
-                    block. The output layer of this green block will have
-                    this many number of channels.
-                kernel_size: int, optional
-                    The size of all convolutional kernels. Defaults to 3,
-                    as used in the paper.
-                data_format: str, optional
-                    The format of the input data. Must be either 'channels_last'
-                    or 'channels_first'. Defaults to `channels_last` for CPU
-                    development. 'channels_first is used in the paper.
-                groups: int, optional
-                    The size of each group for GroupNormalization. Defaults to
-                    8, as used in the paper.
-                kernel_regularizer: regularizer callable for convolutional
-                    kernels.
-        """
-        super(VariationalAutoencoderBlock, self).__init__()
-        # Set up config for self.get_config() to serialize later.
-        self.config = super(VariationalAutoencoderBlock, self).get_config()
-        self.config.update({'filters': filters,
-                            'kernel_size': kernel_size,
-                            'data_format': data_format,
-                            'groups': groups,
-                            'reduction': reduction,
-                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
-                            'kernel_initializer': kernel_initializer,
-                            'normalization': normalization})
-
-        # Retrieve upsampling method.
-        Upsample = get_upsampling(upsampling)
-
-        self.conv3d_ptwise = tf.keras.layers.Conv3D(
-                                filters=filters,
-                                kernel_size=1,
-                                strides=1,
-                                padding='same',
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
-        self.upsample = Upsample(
-                                filters=filters,
-                                kernel_size=kernel_size,
-                                groups=groups,
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                normalization=normalization)
-        self.conv_block = ConvBlock(
-                                filters=filters,
-                                kernel_size=kernel_size,
-                                groups=groups,
-                                reduction=reduction,
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                normalization=normalization)
-
-    def call(self, inputs, training=None):
-        """Returns the forward pass of one VariationalAutoencoderBlock.
-
-            { Conv3D_ptwise -> Upsample3D -> ConvBlock }
-        """
-        inputs = self.conv3d_ptwise(inputs)
-        inputs = self.upsample(inputs, training=training)
-        inputs = self.conv_block(inputs, training=training)
-        return inputs
-
-    def get_config(self):
-        return self.config
 
 
 class VariationalAutoencoder(tf.keras.layers.Layer):
@@ -111,182 +20,129 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  reduction=2,
-                 kernel_size=3,
-                 kernel_regularizer=tf.keras.regularizers.l2(l=1e-5),
-                 kernel_initializer='he_normal',
-                 downsampling='max',
-                 upsampling='linear',
-                 normalization='group'):
-        """Initializes the Variational Autoencoder branch.
-        
-            See https://arxiv.org/pdf/1810.11654.pdf for more details.
-            The variational autoencoder reconstructs the original image
-            given to the encoder to regularize the encoder. To do so,
-            it samples from a learned Gaussian and upsamples.
+                 l2_scale=1e-5,
+                 downsampling='conv',
+                 upsampling='conv',
+                 base_filters=16,
+                 depth=4):
+        """ Initializes the variational autoencoder: consists of sampling
+            then an alternating series of SENet blocks and upsampling.
 
-            Args:
-                data_format: str, optional
-                    The format of the input data. Must be either 'channels_last'
-                    or 'channels_first'. Defaults to `channels_last` for CPU
-                    development. 'channels_first is used in the paper.
-                groups: int, optional
-                    The size of each group for GroupNormalization. Defaults to
-                    8, as used in the paper.
-                kernel_size: kernel_size: int, optional
-                    The size of all convolutional kernels. Defaults to 3,
-                    as used in the paper.
-                kernel_regularizer: tf.keras.regularizers callable, optional
-                    Kernel regularization for convolutional and dense operations.
-                kernel_initializer: tf.keras.initializers callable, optional
-                    Kernel initializer for convolutional operations.
+            References:
+                - [3D MRI brain tumor segmentation using autoencoder regularization](https://arxiv.org/pdf/1810.11654.pdf)
         """
         super(VariationalAutoencoder, self).__init__()
         # Set up config for self.get_config() to serialize later.
+        self.data_format = data_format
+        self.l2_scale = l2_scale
         self.config = super(VariationalAutoencoder, self).get_config()
-        self.config.update({'data_format': data_format,
-                            'groups': groups,
+        self.config.update({'groups': groups,
                             'reduction': reduction,
-                            'kernel_size': kernel_size,
-                            'kernel_regularizer': tf.keras.regularizers.serialize(kernel_regularizer),
-                            'kernel_initializer': kernel_initializer,
                             'downsampling': downsampling,
                             'upsampling': upsampling,
-                            'normalization': normalization})
+                            'base_filters': base_filters,
+                            'depth': depth})
 
-        # Retrieve downsampling method for VD block.
+        # Retrieve downsampling method.
         Downsample = get_downsampling(downsampling)
 
-        # Retrieve upsampling method for VU block.
+        # Retrieve upsampling method.
         Upsample = get_upsampling(upsampling)
 
-        # VD Block
-        self.downsample_VD = Downsample(
-                                filters=VAE_VD_CONV_SIZE,
-                                kernel_size=kernel_size,
-                                groups=groups,
-                                data_format=data_format,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer,
-                                normalization=normalization)
-        self.flatten_VD = tf.keras.layers.Flatten(data_format)
-        self.proj_VD = tf.keras.layers.Dense(
-                                units=VAE_VD_BLOCK_SIZE,
-                                kernel_regularizer=kernel_regularizer,
-                                kernel_initializer=kernel_initializer)
+        # Extra downsampling layer to reduce parameters.
+        self.downsample = Downsample(
+                            filters=base_filters//2,
+                            groups=groups,
+                            data_format=data_format,
+                            kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale))
 
-        # VDraw Block
+        # Build sampling layers.
+        self.flatten = tf.keras.layers.Flatten(data_format)
+        self.proj = tf.keras.layers.Dense(
+                            units=base_filters*(2**(depth-1)),
+                            kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
+                            kernel_initializer='he_normal')
+        self.latent_size = base_filters*(2**(depth-2))
         self.sample = tf.keras.layers.Lambda(sample)
 
-        # VU Block
-        h = int(H/16)
-        w = int(W/16)
-        d = int(D/16)
-        self.proj_VU = tf.keras.layers.Dense(
-                                    units=h * w * d * 1,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer)
-        self.relu_VU = tf.keras.layers.Activation('relu')
-        self.reshape_VU = tf.keras.layers.Reshape((h, w, d, 1) if data_format == 'channels_last' else (1, h, w, d))
-        self.conv1d_VU = tf.keras.layers.Conv3D(
-                                    filters=VAE_VU_BLOCK_SIZE,
-                                    kernel_size=1,
-                                    strides=1,
-                                    padding='same',
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer)
-        self.upsample_VU = Upsample(
-                                    filters=VAE_VU_BLOCK_SIZE,
-                                    kernel_size=kernel_size,
-                                    groups=groups,
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    normalization=normalization)
+        # Extra upsampling layer to counter extra downsampling layer.
+        self.upsample = Upsample(
+                            filters=base_filters*(2**(depth-1)),
+                            groups=groups,
+                            data_format=data_format,
+                            l2_scale=l2_scale)
 
-        self.conv_block_2 = VariationalAutoencoderBlock(
-                                    filters=VAE_CONV_BLOCK2_SIZE,
-                                    kernel_size=kernel_size,
-                                    groups=groups,
-                                    reduction=reduction,
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    upsampling=upsampling,
-                                    normalization=normalization)
+        # Build layers at all spatial levels.
+        self.levels = []
+        for i in range(depth-2, -1, -1):
+            upsample = Upsample(
+                        filters=base_filters*(2**i),
+                        groups=groups,
+                        data_format=data_format,
+                        l2_scale=l2_scale)
+            conv = ConvBlock(
+                        filters=base_filters*(2**i),
+                        groups=groups,
+                        reduction=reduction,
+                        data_format=data_format,
+                        l2_scale=l2_scale)
+            self.levels.append([upsample, conv])
 
-        self.conv_block_1 = VariationalAutoencoderBlock(
-                                    filters=VAE_CONV_BLOCK1_SIZE,
-                                    kernel_size=kernel_size,
-                                    groups=groups,
-                                    reduction=reduction,
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    upsampling=upsampling,
-                                    normalization=normalization)
+        # Output layer convolution.
+        self.out_conv = tf.keras.layers.Conv3D(
+                            filters=IN_CH,
+                            kernel_size=3,
+                            strides=1,
+                            padding='same',
+                            data_format=data_format,
+                            kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
+                            kernel_initializer='he_normal')
 
-        self.conv_block_0 = VariationalAutoencoderBlock(
-                                    filters=VAE_CONV_BLOCK0_SIZE,
-                                    kernel_size=kernel_size,
-                                    groups=groups,
-                                    reduction=reduction,
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer,
-                                    upsampling=upsampling,
-                                    normalization=normalization)
+    def build(self, input_shape):
+        h, w, d = input_shape[1:-1] if self.data_format == 'channels_last' else input_shape[2:]
 
-        self.conv_out = tf.keras.layers.Conv3D(
-                                    filters=IN_CH,
-                                    kernel_size=kernel_size,
-                                    strides=1,
-                                    padding='same',
-                                    data_format=data_format,
-                                    kernel_regularizer=kernel_regularizer,
-                                    kernel_initializer=kernel_initializer)
+        # Build reshaping layers after sampling.
+        self.unproj = tf.keras.layers.Dense(
+                                units=h*w*d*1//8,
+                                kernel_regularizer=tf.keras.regularizers.l2(l=self.l2_scale),
+                                kernel_initializer='he_normal',
+                                activation='relu')
+        self.unflatten = tf.keras.layers.Reshape(
+                                (h//2, w//2, d//2, 1) if self.data_format == 'channels_last' else (1, h//2, w//2, d//2))
+
 
     def call(self, inputs, training=None):
-        """Returns the forward pass of the VariationalAutoencoder.
+        # Downsample.
+        inputs = self.downsample(inputs)
 
-            {
-                VD:        Reduce dimensionality and flatten.
-                VDraw:     Sample mean and variance.
-                VU:        Reconstruct volumetric input.
-                VUp+Block: Upsample and convolve.
-                Vend:      Final output convolution.
-            }
-        """
-        # VD Block
-        inputs = self.downsample_VD(inputs, training=training)
-        inputs = self.flatten_VD(inputs)
-        inputs = self.proj_VD(inputs)
+        # Flatten and project
+        inputs = self.flatten(inputs)
+        inputs = self.proj(inputs)
 
-        # VDraw Block
-        z_mean = inputs[:, :VAE_LATENT_SIZE]
-        z_logvar = inputs[:, VAE_LATENT_SIZE:]
+        # Sample.
+        z_mean = inputs[:, :self.latent_size]
+        z_logvar = inputs[:, self.latent_size:]
         inputs = self.sample([z_mean, z_logvar])
 
-        # VU Block
-        inputs = self.proj_VU(inputs)
-        inputs = self.relu_VU(inputs)
-        inputs = self.reshape_VU(inputs)
-        inputs = self.conv1d_VU(inputs)
-        inputs = self.upsample_VU(inputs, training=training)
+        # Restored projection and reshape
+        inputs = self.unproj(inputs)
+        inputs = self.unflatten(inputs)
 
-        # VUp2 and VBlock2
-        inputs = self.conv_block_2(inputs, training=training)
+        # Upsample.
+        inputs = self.upsample(inputs)
 
-        # VUp1 and VBlock1
-        inputs = self.conv_block_1(inputs, training=training)
+        # Iterate through spatial levels.
+        for level in self.levels:
+            upsample, conv = level
+            inputs = upsample(inputs, training=training)
+            inputs = conv(inputs, training=training)
 
-        # VUp0 and VBlock0
-        inputs = self.conv_block_0(inputs, training=training)
-
-        # Vend
-        inputs = self.conv_out(inputs)
+        # Map convolution to number of original input channels.
+        inputs = self.out_conv(inputs)
 
         return inputs, z_mean, z_logvar
 
     def get_config(self):
+        self.config.update({'data_format': self.data_format,
+                            'l2_scale': self.l2_scale})
         return self.config
