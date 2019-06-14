@@ -82,5 +82,5 @@ We run training on a V100 32GB GPU. Each epoch takes around ~10 minutes to run. 
 |70   |24.800       |0.607              |27.082         |0.624                |
 
 ## TODO:
- [ ] Add test-time implementation of normalizing all input images to `1 mm^3` voxel resolution.
- [ ] Add preprocessing/training/inference on skull-stripping data for test cases.
+ - [ ] Add test-time implementation of normalizing all input images to `1 mm^3` voxel resolution.
+ - [ ] Add preprocessing/training/inference on skull-stripping data for test cases.
