@@ -2,18 +2,18 @@
 We seek to build off of the model that won the BraTS 2018 Segmentation Challenge. The top model was created by the NVDLMED team under Andriy Myronenko, who is the first author of the [3D MRI brain tumor segmentation using autoencoder regularization](https://arxiv.org/pdf/1810.11654.pdf) paper that we use for reference.
 
 ## Model
-We adopt the encoder-decoder convolutional architecture described in the [above paper](https://arxiv.org/pdf/1810.11654.pdf) with a variational autoencoder branch for regularizing the encoder. There are several architectural changes that we have made based on common practices combined with the incompleteness of the paper in some areas. We have
- - Added squeeze-excitation layers (SENet) in the ResNet blocks, as they have been shown to improve performance.
- - Reordered all convolutional layers to consist of `Conv3D`, `GroupNorm`, `ReLU`, except for all pointwise and output layers.
- - Replaced strided convolutions in downsampling with max pooling.
- - Use He normal initialization for *all* layer kernels except those with sigmoid activations, which we use Glorot normal initialization for.
- - Add per-epoch learning rate linear warmup from a base learning rate of `1e-6` for the first 10 epochs.
+We adopt a variation of the [U-net](https://arxiv.org/pdf/1606.06650.pdf) architecture with [variational autoencoder regularization](https://arxiv.org/pdf/1810.11654.pdf). There are several architectural changes that we have made based on common practices combined with the incompleteness of the paper in some areas. We have
+ - Added [spatial and channel squeeze-excitation layers](https://arxiv.org/abs/1803.02579) in the ResNet blocks.
+ - Added [dense connections](https://arxiv.org/pdf/1608.06993.pdf) between encoder ResNet blocks at the same spatial resolution level.
+ - Reordered all convolutional layers to consist of `[Conv3D, GroupNorm, ReLU]`, except for all pointwise and output layers.
+ - Used He normal initialization for *all* layer kernels except those with sigmoid activations, which we use Glorot normal initialization for.
+ - Added per-epoch learning rate linear warmup from a base learning rate of `1e-6` for the first 10 epochs.
+ - Replaced all downsampling and upsampling with convolutional operations.
+ - Halved the number of convolutional filters at all levels to prevent overfit and allow flexible memory usage.
 
-> Use the `--norm [group, batch, layer]` flag to specify the normalization mechanism. Defaults to `group` for group normalization.
+> Use the `--downsamp [max, avg, conv]` flag to specify the downsampling method. Defaults to `conv` for strided convolution.
 
-> Use the `--downsamp [max, avg, conv]` flag to specify the downsampling method. Defaults to `max` for max pooling.
-
-> Use the `--upsamp [linear, conv]` flag to specify the upsampling method. Defaults to `linear` for linear upsampling.
+> Use the `--upsamp [linear, conv]` flag to specify the upsampling method. Defaults to `conv` for strided deconvolution.
 
 ## Usage
 Dependencies are only supported for Python3 and can be found in `requirements.txt`. We use `numpy==1.15` for the bulk of preprocessing and `tensorflow==2.0.0-alpha0` for the model architecture, utilizing `tf.keras.Model` and `tf.keras.Layer` subclassing.
@@ -32,6 +32,7 @@ BraTS17TrainingData/*/*/*[t1,t1ce,t2,flair,seg].nii.gz
 For each example, there are 4 modalities and 1 label, each of shape `240 x 240 x 155`. We slightly adjust the preprocessing steps described in the paper to match our use case with Stanford Medicine:
  - Concatenate the `t1ce` and `flair` modalities along the channel dimension.
  - Compute per-channel image-wise `mean` and `std` and normalize per channel *for the training set*.
+ - Crop as much background as possible across all images. Final image sizes are `155 x 190 x 147`.
  - Serialize to `tf.TFRecord` format for convenience in training.
 
 The training and validation `.tfrecords` files are around 30GB and 3GB, respectively. See `scripts/preprocess.sh` for a detailed example of how to run preprocessing.
@@ -49,7 +50,7 @@ As per the paper, we adopt all hyperparameters used in training (as default argu
 python train.py --train_loc data/train.image_wise.tfrecords --val_loc data/val.image_wise.tfrecords
 ```
 
-> Use the `--n_val_sets` flag to specify how many crops to take to create the validation set. Increase for robustness.
+> Use the `--n_val_sets` flag to specify how many crops to take to create the validation set. Increase for metric robustness.
 
 > Use the `--gpu` flag to run on GPU.
 
@@ -67,7 +68,7 @@ python test.py --test_folder /path/to/test/data --prepro_file data/image_mean_st
 > The `Interpolator` class is used to interpolate linearly depthwise, if some of the inputs are shallower in depth.
 
 ### Results
-We run training on a V100 32GB GPU. Each epoch takes around ~10-15 minutes to run. Below is a sample training curve, using all default model parameters.
+We run training on a V100 32GB GPU. Each epoch takes around ~10 minutes to run. Below is a sample training curve, using all default model parameters.
 
 |Epoch|Training Loss|Training Dice Score|Validation Loss|Validation Dice Score|
 |:---:|:-----------:|:-----------------:|:-------------:|:-------------------:|
@@ -79,3 +80,7 @@ We run training on a V100 32GB GPU. Each epoch takes around ~10-15 minutes to ru
 |50   |28.587       |0.539              |30.266         |0.594                |
 |60   |26.653       |0.593              |27.696         |0.604                |
 |70   |24.800       |0.607              |27.082         |0.624                |
+
+## TODO:
+ [ ] Add test-time implementation of normalizing all input images to `1 mm^3` voxel resolution.
+ [ ] Add preprocessing/training/inference on skull-stripping data for test cases.
