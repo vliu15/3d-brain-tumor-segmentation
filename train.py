@@ -123,16 +123,6 @@ def train(args):
     _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
                                     else (1, IN_CH, H, W, D)))
 
-    # Save model visualization if specified.
-    if args.arch_file:
-        tf.keras.utils.plot_model(
-                model,
-                to_file=args.arch_file,
-                show_shapes=True,
-                show_layer_names=False,
-                rankdir='LR')
-    return
-
     # Get starting epoch.
     start_epoch = model.epoch.value().numpy()
     

@@ -67,7 +67,7 @@ def train_parser():
     parser.add_argument('--data_format', type=str, default='channels_last',
             choices=['channels_first', 'channels_last'],
             help='Format of input data: `channel_first` or `channels_last`.')
-    parser.add_argument('--mirror_prob', type=float, default=0.0,
+    parser.add_argument('--mirror_prob', type=float, default=0.5,
             help='Probability that each inputs are flipped across all 3 axes.')
     parser.add_argument('--n_val_sets', type=int, default=2,
             help='Number of unique validation sets.')
@@ -79,8 +79,6 @@ def train_parser():
             help='File path to save best checkpoint.')
     parser.add_argument('--load_file', type=str, default='',
             help='File path to load complete checkpoint.')
-    parser.add_argument('--arch_file', type=str, default='model.png',
-            help='File path to save model visualization.')
     parser.add_argument('--log_steps', type=int, default=-1,
             help='Frequency at which to output training statistics.')
     parser.add_argument('--patience', type=int, default=10,
