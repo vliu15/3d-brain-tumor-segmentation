@@ -16,7 +16,7 @@ class Decoder(tf.keras.layers.Layer):
                  base_filters=16,
                  depth=4):
         """ Initializes the model decoder: consists of an alternating
-            series of SENet blocks and upsampling layers.
+            series of ResNet blocks with dense connections and upsampling layers.
         """
         super(Decoder, self).__init__()
         # Set up config for self.get_config() to serialize later.
@@ -51,7 +51,7 @@ class Decoder(tf.keras.layers.Layer):
             self.levels.append([upsample, res, conv])
 
         # Output layer convolution.
-        self.out_conv = tf.keras.layers.Conv3D(
+        self.out = tf.keras.layers.Conv3D(
                                 filters=OUT_CH,
                                 kernel_size=1,
                                 strides=1,
@@ -77,7 +77,7 @@ class Decoder(tf.keras.layers.Layer):
             inputs = conv(inputs, training=training)
 
         # Map convolution to number of classes.
-        inputs = self.out_conv(inputs)
+        inputs = self.out(inputs)
         return inputs
 
     def get_config(self):

@@ -4,27 +4,29 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.arg_parser import train_parser
-from utils.losses import DiceLoss, CustomLoss
-from utils.metrics import DiceCoefficient, HausdorffDistance
+from utils.losses import CustomLoss
+from utils.metrics import DiceCoefficient
 from utils.optimizer import ScheduledAdam
 from utils.constants import *
 from model.model import VolumetricCNN
 
 
-def prepare_batch(X, y, prob=0.5, data_format='channels_last'):
-    """Performs augmentation and cropping in training."""
-    
-    axes = [1, 2, 3] if data_format == 'channels_last' else [2, 3, 4]
+def prepare_batch(X, y, data_format='channels_last'):
+    """Performs data augmentation in training."""
+    spatial_axes = [1, 2, 3] if data_format == 'channels_last' else [2, 3, 4]
+    channel_axis = -1 if data_format == 'channels_last' else 1
 
-    # Data augmentation.
-    if np.random.uniform() < prob:
-        X = tf.reverse(X, axis=axes)
-        y = tf.reverse(y, axis=axes)
+    # Apply random intensity shift.
+    _, var = tf.nn.moments(X, axes=spatial_axes, keepdims=True)
+    shift = np.random.uniform()
+    scale = np.random.uniform()
+    X += (0.2 * shift - 0.1) * tf.sqrt(var)
+    X *= 0.2 * scale + 0.9
 
     # Sample corner point.
-    h = np.random.randint(H, X.shape[axes[0]])
-    w = np.random.randint(W, X.shape[axes[1]])
-    d = np.random.randint(D, X.shape[axes[2]])
+    h = np.random.randint(low=H, high=X.shape[spatial_axes[0]])
+    w = np.random.randint(low=W, high=X.shape[spatial_axes[1]])
+    d = np.random.randint(low=D, high=X.shape[spatial_axes[2]])
 
     # Create crop.
     if data_format == 'channels_last':
@@ -33,14 +35,20 @@ def prepare_batch(X, y, prob=0.5, data_format='channels_last'):
     else:
         X = X[:, :, h-H:h, w-W:w, d-D:d]
         y = y[:, :, h-H:h, w-W:w, d-D:d]
+
+    # Randomly flip across each axis.
+    for axis in spatial_axes:
+        if np.random.uniform() < 0.5:
+            X = tf.reverse(X, axis=[axis])
+            y = tf.reverse(y, axis=[axis])
         
     return X, y
 
 
-def prepare_val_set(dataset, n_sets=2, prob=0.5, data_format='channels_last'):
+def prepare_val_set(dataset, n_sets=1, data_format='channels_last'):
     """Prepares validation sets (with cropping and flipping)."""
     def parse_example(X, y):
-        return prepare_batch(X, y, prob=prob, data_format=data_format)
+        return prepare_batch(X, y, data_format=data_format)
     
     # Sample arbitrary number of crops per validation example for robustness.
     for i in range(n_sets):
@@ -95,36 +103,19 @@ def train(args):
     prepro_d = prepro['d_max'] - prepro['d_min']
 
     # Load data.
-    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size,
-                                          (prepro_h, prepro_w, prepro_d), buffer_size=260,
-                                          data_format=args.data_format)
-    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
-                                      (prepro_h, prepro_w, prepro_d), buffer_size=0,
-                                      data_format=args.data_format)
-    val_data = prepare_val_set(val_data, n_sets=args.n_val_sets,
-                               prob=args.mirror_prob, data_format=args.data_format)
+    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size, (prepro_h, prepro_w, prepro_d),
+                                          buffer_size=260, data_format=args.data_format)
+    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size, (prepro_h, prepro_w, prepro_d),
+                                      buffer_size=0, data_format=args.data_format)
+    val_data = prepare_val_set(val_data, n_sets=args.n_val_sets, data_format=args.data_format)
     n_val *= args.n_val_sets
-
     print('{} training examples.'.format(n_train), flush=True)
     print('{} validation examples.'.format(n_val), flush=True)
 
     # Initialize model.
-    model = VolumetricCNN(
-                    data_format=args.data_format,
-                    groups=args.gn_groups,
-                    reduction=args.se_reduction,
-                    l2_scale=args.l2_scale,
-                    downsampling=args.downsamp,
-                    upsampling=args.upsamp,
-                    base_filters=args.base_filters,
-                    depth=args.depth)
-
-    # Build model with initial forward pass.
+    model = VolumetricCNN(**args.model_args)
     _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
                                     else (1, IN_CH, H, W, D)))
-
-    # Get starting epoch.
-    start_epoch = model.epoch.value().numpy()
     
     # Load weights if specified.
     if args.load_file:
@@ -135,21 +126,19 @@ def train(args):
     optimizer = ScheduledAdam(learning_rate=args.lr)
 
     # Initialize loss and metrics.
-    loss_fn = CustomLoss(decoder_loss=args.decoder_loss, data_format=args.data_format)
+    loss_fn = CustomLoss(data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accu = tf.keras.metrics.BinaryAccuracy(name='train_accu')
     train_prec = tf.keras.metrics.Precision(name='train_prec')
     train_reca = tf.keras.metrics.Recall(name='train_reca')
     train_dice = DiceCoefficient(name='train_dice', data_format=args.data_format)
-    train_haus = HausdorffDistance(name='train_haus', data_format=args.data_format)
 
     val_loss = tf.keras.metrics.Mean(name='val_loss')
     val_accu = tf.keras.metrics.BinaryAccuracy(name='val_accu')
     val_prec = tf.keras.metrics.Precision(name='val_prec')
     val_reca = tf.keras.metrics.Recall(name='val_reca')
     val_dice = DiceCoefficient(name='val_dice', data_format=args.data_format)
-    val_haus = HausdorffDistance(name='val_haus', data_format=args.data_format)
 
     # Load model weights if specified.
     if args.load_file:
@@ -173,20 +162,21 @@ def train(args):
             f.write(header + '\n')
 
     best_val_loss = float('inf')
+    n_plateaus = 0
     patience = 0
 
     # Train.
-    for epoch in range(start_epoch, args.n_epochs):
+    for epoch in range(model.epoch.value().numpy(), args.n_epochs):
         print('Epoch {}.'.format(epoch))
-        model.epoch.assign(epoch)           # Track epoch in model.
-        optimizer(epoch=epoch)              # Schedule learning rate.
+        model.epoch.assign(epoch)
+        optimizer(epoch=epoch)
 
         # Training epoch.
         for step, (X, y) in tqdm(enumerate(train_data, 1), total=n_train, desc='Training      '):
-            X, y = prepare_batch(X, y, prob=args.mirror_prob, data_format=args.data_format)
+            X, y = prepare_batch(X, y, data_format=args.data_format)
             with tf.device(args.device):
+                # Forward and loss.
                 with tf.GradientTape() as tape:
-                    # Forward and loss.
                     y_pred, y_vae, z_mean, z_logvar = model(X, training=True, inference=False)
                     loss = loss_fn(X, y, y_pred, y_vae, z_mean, z_logvar)
                     loss += tf.reduce_sum(model.losses)
@@ -200,16 +190,6 @@ def train(args):
                 train_prec.update_state(y, y_pred)
                 train_reca.update_state(y, y_pred)
                 train_dice.update_state(y, y_pred)
-
-            # Output loss to console.
-            if args.log_steps > 0 and step % args.log_steps == 0:
-                print('Step {}. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
-                       Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
-                       .format(step, l=train_loss.result(),
-                                     v=train_accu.result(),
-                                     p=train_prec.result(),
-                                     r=train_reca.result(),
-                                     d=train_dice.result()), flush=True)
 
         print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
                Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
@@ -225,7 +205,6 @@ def train(args):
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_logvar = model(X, training=False, inference=False)
                 loss = loss_fn(X, y, y_pred, y_vae, z_mean, z_logvar)
-                loss += tf.reduce_sum(model.losses)
 
                 val_loss.update_state(loss)
                 val_accu.update_state(y, y_pred)
@@ -252,9 +231,9 @@ def train(args):
                                   str(train_reca.result().numpy()),
                                   str(train_dice.result().numpy()),
                                   str(val_loss.result().numpy()),
+                                  str(val_accu.result().numpy()),
                                   str(val_prec.result().numpy()),
                                   str(val_reca.result().numpy()),
-                                  str(val_accu.result().numpy()),
                                   str(val_dice.result().numpy())])
                 f.write(entry + '\n')
 
@@ -265,9 +244,13 @@ def train(args):
             patience = 0
             print('Saved model weights.')
         elif patience == args.patience:
-            print('Validation loss has not improved in {} epochs. Stopped training.'
-                    .format(args.patience))
-            break
+            n_plateaus += 1
+            patience = 0
+            optimizer.init_lr *= 0.1
+            if n_plateaus == args.n_plateaus:
+                print('Validation loss has not improved in {} epochs over {} plateaus. Stopped training.'
+                        .format(args.patience, args.n_plateaus))
+                return
         else:
             patience += 1
 

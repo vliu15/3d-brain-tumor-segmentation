@@ -1,29 +1,7 @@
 """Handles all command-line argument parsing."""
 import argparse
+import json
 import os
-
-
-def add_model_args(parser):
-    # Architectural
-    parser.add_argument('--base_filters', type=int, default=16,
-            help='Number of filters in input/output layers.')
-    parser.add_argument('--depth', type=int, default=4,
-            help='Number of spatial levels thorughout network.')
-    parser.add_argument('--downsamp', type=str, default='conv',
-            choices=['max', 'conv'],
-            help='Method of downsampling.')
-    parser.add_argument('--upsamp', type=str, default='conv',
-            choices=['linear', 'conv'],
-            help='Method of upsampling.')
-    
-    # Parameters
-    parser.add_argument('--gn_groups', type=int, default=8,
-            help='Size of groups for group normalization.')
-    parser.add_argument('--se_reduction', type=int, default=4,
-            help='Reduction ratio in excitation layers of SENet blocks.')
-    parser.add_argument('--l2_scale', type=float, default=1e-5,
-            help='Scale of L2-regularization for convolution kernel weights.')
-    return parser
 
 
 def prepro_parser():
@@ -64,12 +42,7 @@ def train_parser():
             help='Location of preprocessed validation data.')
     parser.add_argument('--prepro_loc', type=str, required=True,
             help='Location of preprocessed statistics.')
-    parser.add_argument('--data_format', type=str, default='channels_last',
-            choices=['channels_first', 'channels_last'],
-            help='Format of input data: `channel_first` or `channels_last`.')
-    parser.add_argument('--mirror_prob', type=float, default=0.5,
-            help='Probability that each inputs are flipped across all 3 axes.')
-    parser.add_argument('--n_val_sets', type=int, default=2,
+    parser.add_argument('--n_val_sets', type=int, default=1,
             help='Number of unique validation sets.')
 
     # Training.
@@ -78,35 +51,41 @@ def train_parser():
     parser.add_argument('--save_file', type=str, default='chkpt.hdf5',
             help='File path to save best checkpoint.')
     parser.add_argument('--load_file', type=str, default='',
-            help='File path to load complete checkpoint.')
-    parser.add_argument('--log_steps', type=int, default=-1,
-            help='Frequency at which to output training statistics.')
-    parser.add_argument('--patience', type=int, default=10,
-            help='Number of epochs if validation scores have not improved \
-                  before stopping training')
+            help='File path to load weights checkpoint.')
+    parser.add_argument('--args_file', type=str, default='',
+            help='File path to load model args corresponding to checkpoint.')
+    parser.add_argument('--patience', type=int, default=20,
+            help='Number of epochs without validation loss decrease to reduce on plateau.')
+    parser.add_argument('--n_plateaus', type=int, default=3,
+            help='Number of times to reduce learning rate on loss plateau.')
 
     # Optimization.
-    parser.add_argument('--n_epochs', type=int, default=150,
+    parser.add_argument('--n_epochs', type=int, default=200,
             help='Total number of epochs to train for.')
     parser.add_argument('--lr', type=float, default=1e-4,
             help='Initial learning rate of Adam optimizer.')
-    parser.add_argument('--warmup_epochs', type=int, default=10,
-            help='Number of epochs for learning rate warmup.')
     parser.add_argument('--batch_size', type=int, default=1,
             help='Batch size to be used in training.')
-    parser.add_argument('--decoder_loss', type=str, default='dice',
-            choices=['dice', 'focal'],
-            help='Loss function to use to optimize decoder.')
-
-    # Model.
-    parser = add_model_args(parser)
 
     args = parser.parse_args()
 
     args.device = '/device:GPU:0' if args.gpu else '/cpu:0'
     if not args.gpu:
-        assert args.data_format == 'channels_last', \
+        assert args.model_args.data_format == 'channels_last', \
             'tf.keras.layers.Conv3D only supports `channels_last` input for CPU.'
+
+    if args.load_file:
+        assert args.args_file == True, \
+            'Loading from checkpoint requires a corresponding set of model args.'
+
+    # Set model initialization arguments.
+    if args.args_file:
+        with open(args.args_file, 'r') as f:
+            args.model_args = json.load(f)
+    else:
+        args.model_args = {}
+
+    args.data_format = args.model_args['data_format']
 
     return args
 
@@ -118,32 +97,37 @@ def test_parser():
     parser.add_argument('--gpu', action='store_true', default=False,
             help='Whether to use GPU on evaluation.')
 
+    # Model.
+    parser.add_argument('--chkpt_file', type=str, required=True,
+            help='Path to weights dump of model training.')
+    parser.add_argument('--model_args', type=str, required=True,
+            help='Path to pickle dump of model args to reinitialize model.')
+
     # Data.
     parser.add_argument('--test_folder', type=str, required=True,
             help='Location of test set data.')
+    parser.add_argument('--prepro_file', type=str, required=True,
+            help='Path to dumped preprocessed stats.')
 
-    # Segmentation.
-    parser.add_argument('--threshold', type=float, default=0.5,
-            help='Threshold at which to create mask from probabilities.')
+    # Interpolation.
+    parser.add_argument('--order', type=int, default=3,
+            help='Polynomial order of spline interpolation.')
+    parser.add_argument('--mode', type=str, default='reflect',
+            help='Method of extrapolation for spline interpolation.')
+
+    # Generation.
     parser.add_argument('--stride', type=int, default=64,
             help='Stride at which to take sample crops from inpute image.')
     parser.add_argument('--batch_size', type=int, default=8,
             help='Batch size of crops to load into model.')
 
-    # Model path.
-    parser.add_argument('--chkpt_file', type=str, required=True,
-            help='Path to weights dump of model training.')
-    parser.add_argument('--prepro_file', type=str, required=True,
-            help='Path to dumped preprocessed stats.')
-
-    # Model.
-    parser = add_model_args(parser)
-
+    # Segmentation.
+    parser.add_argument('--threshold', type=float, default=0.5,
+            help='Threshold at which to create mask from probabilities.')
+    
     args = parser.parse_args()
 
-    args.device = '/device:GPU:0' if args.gpu else '/cpu:0'
-    if not args.gpu:
-        assert args.data_format == 'channels_last', \
-            'tf.keras.layers.Conv3D only supports `channels_last` input for CPU.'
+    # Set model initialization arguments.
+    args.model_args = json.load(args.model_args)
 
     return args

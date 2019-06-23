@@ -7,6 +7,7 @@ import scipy
 import nibabel as nib
 from tqdm import tqdm
 import random
+from scipy.ndimage import zoom
 
 from utils.arg_parser import test_parser
 from utils.constants import *
@@ -14,62 +15,70 @@ from model.model import VolumetricCNN
 
 
 class Interpolator(object):
-    """Depthwise interpolator for shorter images."""
-    def __init__(self, data_format='channels_last'):
+    def __init__(self, data_format, order=3, mode='reflect'):
         self.data_format = data_format
+        self.order = order
+        self.mode = mode
 
-    def __call__(self, image):
-        def interpolate(slice1, slice2):
-            step = (slice2 - slice1) / self._ratio
-            return tf.stack([slice1 + i*step for i in range(self._ratio)], axis=d_axis)
+    def __call__(self, subject_folder):
+        """Extracts Numpy image and normalizes it to 1 mm^3."""
+        # Extract raw images from each.
+        image = []
+        pixdim = []
+        affine = []
+        
+        for name in BRATS_MODALITIES:
+            file_card = glob.glob(os.path.join(subject_folder, '*' + name + '*' + '.nii' + '*'))[0]
+            img = nib.load(file_card)
 
-        self.image_shape = image.shape
-        d_axis = 2 if self.data_format == 'channels_last' else -1
-        d = image.shape[d_axis]
+            array.append(np.array(img.dataobj).astype(np.float32))
+            pixdim.append(img.header['pixdim'][:4])
+            affine.append(np.stack([img.header['srow_x'],
+                                    img.header['srow_y'],
+                                    img.header['srow_z'],
+                                    np.array([0., 0., 0., 1.])], axis=0))
+            
+            axis = -1 if self.data_format == 'channels_last' else 0
 
-        # Determine upscaling ratio.
-        self._ratio = (D // (d-1)) + 1
+            # Prepare image.
+            image = np.stack(image, axis=axis)
+            self.pixdim = np.mean(pixdim, axis=0)
+            self.affine = np.mean(affine, axis=0)
 
-        # Check if image is sufficiently sized.
-        if self._ratio == 1:
+            # Scale voxel size.
+            zoomdim = list(pixdim[:-1])
+            zoomdim.insert(axis, 1.0)
+            image = zoom(image, zoomdim, order=self.order, mode=self.mode)
+
+            # Interpolate depth.
+            depthzoom = np.ones_like(self.pixdim)
+            depthzoom[axis] = self.pixdim[-1]
+            image = zoom(image, list(depthzoom), order=self.order, mode=self.mode)
+
             return image
 
-        # Loop through and fill in slices.
-        output = tf.concat([interpolate(image[:, :, :, i], image[:, :, :, i+1])
-                                for i in range(d-1)], axis=d_axis)
-
-        # Add on end slice.
-        end = image[:, :, -1, :] if self.data_format == 'channels_last' else image[:, :, :, -1]
-        output = tf.concat([output, tf.expand_dims(end, axis=d_axis)], axis=d_axis)
-
-        return output
-
     def reverse(self, output):
-        """Compresses interpolated output to original size."""
-        if self._ratio == 1:
-            return output
+        """Reverses the interpolation performed in __call__."""
+        output = output.numpy()
+        axis = -1 if self.data_format == 'channels_last' else 0
 
-        d_axis = 2 if self.data_format == 'channels_last' else -1
-        d = output.shape[d_axis]
-        window = self._ratio // 2
+        # Reverse depth interpolation.
+        depthzoom = np.ones_like(self.pixdim)
+        depthzoom[axis] = 1.0 / self.pixdim[-1]
+        output = zoom(output, list(depthzoom), order=self.order, mode=self.mode)
 
-        # Each depth is the average of the window of values around it.
-        if self.data_format == 'channels_last':
-            output = tf.stack([tf.reduce_mean(output[:, :, max(i-window, 0):min(i+window, d), :], axis=d_axis)
-                        for i in range(0, d, self._ratio)], axis=d_axis)
-        else:
-            output = tf.stack([tf.reduce_mean(output[:, :, :, max(i-window, 0):min(i+window, d)], axis=d_axis)
-                        for i in range(0, d, self._ratio)], axis=d_axis)
+        # Reverse voxel scaling.
+        zoomdim = list(1.0 / pixdim[:-1])
+        output = zoom(output, zoomdim, order=self.order, mode=self.mode)
 
         return output
-
+        
 
 class Generator(object):
-    def __init__(self, batch_size, stride=32,
-                 data_format='channels_last'):
+    def __init__(self, batch_size, data_format, stride=32):
         self.batch_size = batch_size
-        self.stride = stride
         self.data_format = data_format
+        self.stride = stride
 
     def __call__(self, image):
         """Generates crops with stride to create mask."""
@@ -102,11 +111,10 @@ class Generator(object):
 
 
 class Segmentor(object):
-    def __init__(self, model, threshold=0.5,
-                 data_format='channels_last', **kwargs):
+    def __init__(self, model, data_format, threshold=0.5, **kwargs):
         self.model = model
-        self.threshold = threshold
         self.data_format = data_format
+        self.threshold = threshold
 
     def __call__(self, image, generator):
         if self.data_format == 'channels_last':
@@ -154,23 +162,6 @@ class Segmentor(object):
         return output
 
 
-def get_npy_image(subject_folder, name):
-    try:
-        file_card = glob.glob(os.path.join(subject_folder, '*' + name + '.nii' + '*'))[0]
-    except:
-        file_card = glob.glob(os.path.join(subject_folder, '*' + name + '_proc.nii'))[0]
-    return np.array(nib.load(file_card).dataobj).astype(np.float32)
-
-
-def convert_to_nii(save_folder, mask):
-    affine = np.array([[-0.977, 0., 0., 91.1309967],
-                       [0., -0.977, 0., 149.34700012],
-                       [0., 0., 1., -74.67500305],
-                       [0., 0., 0., 1.]])
-    img = nib.Nifti1Image(mask, affine)
-    nib.save(img, os.path.join(save_folder, 'mask.nii'))
-    
-
 def dice_coefficient(y_true, y_pred, eps=1.0):
     """Returns dice coefficient of one prediction."""
     # Calculate mask for label 1.
@@ -195,7 +186,6 @@ def dice_coefficient(y_true, y_pred, eps=1.0):
     dice_fours = (tf.reduce_sum(true_fours * pred_fours) + eps) / (tf.reduce_sum(true_fours + pred_fours) + eps)
 
     # Calculated macro- and micro- dice scores.
-    print([dice_ones, dice_twos, dice_fours])
     dice_macro = tf.reduce_mean([dice_ones, dice_twos, dice_fours])
     dice_micro = (tf.reduce_sum(true_all * pred_all) + eps) / (tf.reduce_sum(true_all + pred_all) + eps)
     
@@ -209,16 +199,7 @@ def main(args):
     voxel_std = tf.convert_to_tensor(data['std'], dtype=tf.float32)
     
     # Initialize model.
-    model = VolumetricCNN(
-                        data_format=args.data_format,
-                        kernel_size=args.conv_kernel_size,
-                        groups=args.gn_groups,
-                        reduction=args.se_reduction,
-                        kernel_regularizer=tf.keras.regularizers.l2(l=args.l2_scale),
-                        kernel_initializer=args.kernel_init,
-                        downsampling=args.downsamp,
-                        upsampling=args.upsamp,
-                        normalization=args.norm)
+    model = VolumetricCNN(**args.model_args)
 
     # Build model with initial forward pass.
     _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
@@ -227,35 +208,26 @@ def main(args):
     model.load_weights(args.chkpt_file)
 
     # Initialize interpolator, generator, and segmentor.
-    interpolator = Interpolator(data_format=args.data_format)
-    generator = Generator(args.batch_size, stride=args.stride, data_format=args.data_format)
-    segmentor = Segmentor(model, threshold=args.threshold, data_format=args.data_format)
+    interpolator = Interpolator(args.model_args.data_format, order=args.order, mode=args.mode)
+    generator = Generator(args.model_args.data_format, args.batch_size, stride=args.stride)
+    segmentor = Segmentor(model, args.model_args.data_format, threshold=args.threshold)
 
     # Loop through each patient.
     for subject_folder in tqdm(glob.glob(os.path.join(args.test_folder, '*'))):
-
         with tf.device(args.device):
-            axis = -1 if args.data_format == 'channels_last' else 0
-
-            # Extract raw images from each.
-            try:
-                X = tf.stack(
-                    [get_npy_image(subject_folder, name) for name in BRATS_MODALITIES], axis=axis)
-            except:
-                X = tf.stack(
-                    [get_npy_image(subject_folder, name) for name in RTOG_MODALITIES], axis=axis)
+            # Rescale and interpolate input image.
+            X = interpolator(subject_folder)
 
             # If data is labeled, extract label.
             try:
-                y = tf.expand_dims(get_npy_image(subject_folder, TRUTH), axis=axis)
+                file_card = glob.glob(os.path.join(subject_folder, '*' + name + '*' + '.nii' + '*'))[0]
+                y = np.array(nib.load(file_card).dataobj).astype(np.float32)
+                y = tf.expand_dims(y, axis=axis)
             except:
                 y = None
 
             # Normalize input image.
             X = (X - voxel_mean) / voxel_std
-
-            # Interpolate depth (if necessary).
-            X = interpolator(X)
 
             # Generate probabilities.
             y_pred = segmentor(X, generator)
@@ -273,7 +245,8 @@ def main(args):
                         .format(subject_folder.split('/')[-1], ma=macro, mi=micro), flush=True)
 
         # Save as Nifti.
-        convert_to_nii(os.path.join(args.test_folder, subject_folder), y_pred)
+        nib.save(nib.Nifti1Image(y_pred, affine),
+                 os.path.join(args.test_folder, subject_folder, 'mask.nii'))
 
 
 if __name__ == '__main__':

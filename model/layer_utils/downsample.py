@@ -26,16 +26,16 @@ class ConvDownsample(tf.keras.layers.Layer):
                             'l2_scale': l2_scale})
 
         self.conv = tf.keras.layers.Conv3D(
-                                filters=filters,
-                                kernel_size=3,
-                                strides=2,
-                                padding='same',
-                                data_format=data_format,
-                                kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
-                                kernel_initializer='he_normal')
+                            filters=filters,
+                            kernel_size=3,
+                            strides=2,
+                            padding='same',
+                            data_format=data_format,
+                            kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
+                            kernel_initializer='he_normal')
         self.norm = GroupNormalization(
-                        groups=groups,
-                        axis=-1 if data_format == 'channels_last' else 1)
+                            groups=groups,
+                            axis=-1 if data_format == 'channels_last' else 1)
         self.relu = tf.keras.layers.Activation('relu')
 
     def __call__(self, inputs, training=None):
@@ -54,7 +54,7 @@ class MaxDownsample(tf.keras.layers.Layer):
                  **kwargs):
         super(MaxDownsample, self).__init__()
         self.config = super(MaxDownsample, self).get_config()
-        self.config.update({'daat_format': data_format})
+        self.config.update({'data_format': data_format})
 
         self.maxpool = tf.keras.layers.MaxPooling3D(
                             pool_size=2,

@@ -88,7 +88,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
             self.levels.append([upsample, conv])
 
         # Output layer convolution.
-        self.out_conv = tf.keras.layers.Conv3D(
+        self.out = tf.keras.layers.Conv3D(
                             filters=IN_CH,
                             kernel_size=3,
                             strides=1,
@@ -137,7 +137,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
             inputs = conv(inputs, training=training)
 
         # Map convolution to number of original input channels.
-        inputs = self.out_conv(inputs)
+        inputs = self.out(inputs)
 
         return inputs, z_mean, z_logvar
 

@@ -9,7 +9,7 @@ class L2Loss(tf.keras.losses.Loss):
         super(L2Loss, self).__init__(**kwargs)
 
     def __call__(self, y_true, y_pred, sample_weight=None):
-        return tf.losses.mse(y_true, y_pred)
+        return tf.reduce_mean((y_true - y_pred) ** 2)
 
 
 class KullbackLeiblerLoss(tf.keras.losses.Loss):
@@ -175,12 +175,13 @@ class FocalLoss(tf.keras.losses.Loss):
         alpha = y_true * self.alpha + (1.0 - y_true) * (1.0 - self.alpha)
 
         focus = (1 - y_pred) ** self.gamma
-        return -tf.reduce_sum(alpha * focus * tf.math.log(y_pred))
+
+        loss = -tf.reduce_sum(alpha * focus * tf.math.log(y_pred), axis=axis)
+        return tf.reduce_mean(loss)
 
 
 class CustomLoss(tf.keras.losses.Loss):
     def __init__(self,
-                 decoder_loss='dice',
                  name='custom_loss',
                  eps=1.0,
                  data_format='channels_last',
@@ -188,10 +189,7 @@ class CustomLoss(tf.keras.losses.Loss):
         super(CustomLoss, self).__init__(**kwargs)
         self.l2_loss = L2Loss(name='l2', **kwargs)
         self.kl_loss = KullbackLeiblerLoss(name='kl', **kwargs)
-        if decoder_loss == 'dice':
-            self.dec_loss = DiceLoss(name='dice', **kwargs)
-        elif decoder_loss == 'focal':
-            self.dec_loss = FocalLoss(name='focal', **kwargs)
+        self.dec_loss = DiceLoss(name='dice', **kwargs)
 
     def __call__(self, x, y_true, y_pred, y_vae, z_mean, z_logvar, sample_weight=None):
         n = tf.cast(tf.reduce_prod(x.shape), tf.float32)
