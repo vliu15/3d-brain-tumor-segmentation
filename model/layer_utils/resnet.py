@@ -1,4 +1,4 @@
-"""Contains convolutional sublayer and ResNet block classes."""
+"""Contains ResNet block class."""
 import tensorflow as tf
 
 from model.layer_utils.group_norm import GroupNormalization
@@ -53,7 +53,7 @@ class ResnetBlock(tf.keras.layers.Layer):
         self.dense_sigmoid = tf.keras.layers.Dense(
                                 units=filters,
                                 kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
-                                kernel_initializer='glorot_normal',
+                                kernel_initializer='he_normal',
                                 use_bias=False,
                                 activation='sigmoid')
         self.reshape = tf.keras.layers.Reshape(
@@ -67,12 +67,13 @@ class ResnetBlock(tf.keras.layers.Layer):
                                 strides=1,
                                 padding='same',
                                 data_format=data_format,
-                                kernel_initializer='glorot_normal',
+                                kernel_initializer='he_normal',
                                 kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
+                                use_bias=False,
                                 activation='sigmoid')
 
-        self.scale = tf.keras.layers.Multiply()
-        self.add = tf.keras.layers.Add()
+        self.scale_res = tf.keras.layers.Multiply()
+        self.add_se = tf.keras.layers.Add()
 
         # Convolutional layers.
         self.convs = []
@@ -122,7 +123,7 @@ class ResnetBlock(tf.keras.layers.Layer):
         spse = self.spatial(res)
 
         # Scale residual.
-        res = self.scale([res, self.add([spse, chse])])
+        res = self.scale_res([res, self.add_se([spse, chse])])
 
         # Convolutional layers.
         for conv, norm, relu in self.convs:

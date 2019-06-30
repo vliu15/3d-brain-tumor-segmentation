@@ -103,10 +103,12 @@ def train(args):
     prepro_d = prepro['d_max'] - prepro['d_min']
 
     # Load data.
-    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size, (prepro_h, prepro_w, prepro_d),
-                                          buffer_size=260, data_format=args.data_format)
-    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size, (prepro_h, prepro_w, prepro_d),
-                                      buffer_size=0, data_format=args.data_format)
+    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size,
+                                          (prepro_h, prepro_w, prepro_d), buffer_size=260,
+                                          data_format=args.data_format)
+    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
+                                      (prepro_h, prepro_w, prepro_d), buffer_size=0,
+                                      data_format=args.data_format)
     val_data = prepare_val_set(val_data, n_sets=args.n_val_sets, data_format=args.data_format)
     n_val *= args.n_val_sets
     print('{} training examples.'.format(n_train), flush=True)
@@ -162,7 +164,6 @@ def train(args):
             f.write(header + '\n')
 
     best_val_loss = float('inf')
-    n_plateaus = 0
     patience = 0
 
     # Train.
@@ -244,13 +245,9 @@ def train(args):
             patience = 0
             print('Saved model weights.')
         elif patience == args.patience:
-            n_plateaus += 1
-            patience = 0
-            optimizer.init_lr *= 0.1
-            if n_plateaus == args.n_plateaus:
-                print('Validation loss has not improved in {} epochs over {} plateaus. Stopped training.'
-                        .format(args.patience, args.n_plateaus))
-                return
+            print('Validation loss has not improved in {} epochs. Stopped training.'
+                    .format(args.patience))
+            return
         else:
             patience += 1
 

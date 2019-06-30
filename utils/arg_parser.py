@@ -54,13 +54,11 @@ def train_parser():
             help='File path to load weights checkpoint.')
     parser.add_argument('--args_file', type=str, default='',
             help='File path to load model args corresponding to checkpoint.')
-    parser.add_argument('--patience', type=int, default=20,
-            help='Number of epochs without validation loss decrease to reduce on plateau.')
-    parser.add_argument('--n_plateaus', type=int, default=3,
-            help='Number of times to reduce learning rate on loss plateau.')
+    parser.add_argument('--patience', type=int, default=-1,
+            help='Number of epochs without validation loss decrease to stop training.')
 
     # Optimization.
-    parser.add_argument('--n_epochs', type=int, default=200,
+    parser.add_argument('--n_epochs', type=int, default=300,
             help='Total number of epochs to train for.')
     parser.add_argument('--lr', type=float, default=1e-4,
             help='Initial learning rate of Adam optimizer.')

@@ -45,7 +45,9 @@ class Encoder(tf.keras.layers.Layer):
                             reduction=reduction,
                             data_format=data_format,
                             l2_scale=l2_scale)
-                convs.append(conv)
+                dense = tf.keras.layers.Concatenate(
+			                axis=-1 if data_format == 'channels_last' else 1) if j > 0 else None
+                convs.append([conv, dense])
             
             # Concatenate before downsampling.
             concat = tf.keras.layers.Concatenate(
@@ -71,7 +73,9 @@ class Encoder(tf.keras.layers.Layer):
             cache = []
 
             # Iterate through convolutional blocks.
-            for conv in convs:
+            for conv, dense in convs:
+                if dense is not None:
+                    inputs = dense([inputs] + cache)
                 inputs = conv(inputs, training=training)
                 cache.append(inputs)
 

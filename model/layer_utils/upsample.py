@@ -49,14 +49,12 @@ class ConvUpsample(tf.keras.layers.Layer):
 class LinearUpsample(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
-                 groups=8,
                  data_format='channels_last',
                  l2_scale=1e-5,
                  **kwargs):
         super(LinearUpsample, self).__init__()
         self.config = super(LinearUpsample, self).get_config()
         self.config.update({'filters': filters,
-                            'groups': groups,
                             'data_format': data_format,
                             'l2_scale': l2_scale})
 
@@ -71,16 +69,10 @@ class LinearUpsample(tf.keras.layers.Layer):
         self.linear = tf.keras.layers.UpSampling3D(
                                 size=2,
                                 data_format=data_format)
-        self.norm = GroupNormalization(
-                            groups=groups,
-                            axis=-1 if data_format == 'channels_last' else 1)
-        self.relu = tf.keras.layers.Activation('relu')
 
     def __call__(self, inputs, training=None):
         inputs = self.ptwise(inputs)
         inputs = self.linear(inputs)
-        inputs = self.norm(inputs)
-        inputs = self.relu(inputs)
         return inputs
 
     def get_config(self):
