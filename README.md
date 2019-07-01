@@ -1,35 +1,29 @@
 # Volumetric Brain Tumor Segmentation
-We seek to utilize the best techniques to improve dense, volumetric semantic segmentation. Specifically, we adopt the U-net architectural style, variational autoencoder for regularization, residual blocks, spatial and channel squeeze-excitation layers, and dense connections.
+This repository experiments with best techniques to improve dense, volumetric semantic segmentation. Specifically, the model is of U-net architectural style and includes variational autoencoder (for regularization), residual blocks, spatial and channel squeeze-excitation layers, and dense connections.
 
 ## Model
-We adopt a variation of the [U-net](https://arxiv.org/pdf/1606.06650.pdf) architecture with [variational autoencoder regularization](https://arxiv.org/pdf/1810.11654.pdf). There are several architectural changes that we have made based on common practices combined with the incompleteness of the paper in some areas. We have
- - Added [spatial and channel squeeze-excitation layers](https://arxiv.org/abs/1803.02579) in the ResNet blocks.
- - Added [dense connections](https://arxiv.org/pdf/1608.06993.pdf) between encoder ResNet blocks at the same spatial resolution level.
- - Reordered all convolutional layers to consist of `[Conv3D, GroupNorm, ReLU]`, except for all pointwise and output layers.
- - Used He normal initialization for *all* layer kernels except those with sigmoid activations, which we use Glorot normal initialization for.
- - Added per-epoch learning rate linear warmup from a base learning rate of `1e-6` for the first 10 epochs.
- - Replaced all downsampling and upsampling with convolutional operations.
- - Halved the number of convolutional filters at all levels to prevent overfit and allow flexible memory usage.
-
-> Use the `--downsamp [max, avg, conv]` flag to specify the downsampling method. Defaults to `conv` for strided convolution.
-
-> Use the `--upsamp [linear, conv]` flag to specify the upsampling method. Defaults to `conv` for strided deconvolution.
+This is a variation of the [U-net](https://arxiv.org/pdf/1606.06650.pdf) architecture with [variational autoencoder regularization](https://arxiv.org/pdf/1810.11654.pdf). There are several architectural enhancements, including
+ - [Spatial and channel squeeze-excitation layers](https://arxiv.org/abs/1803.02579) in the ResNet blocks.
+ - [Dense connections](https://arxiv.org/pdf/1608.06993.pdf) between encoder ResNet blocks at the same spatial resolution level.
+ - Convolutional layers to consist of order `[Conv3D, GroupNorm, ReLU]`, except for all pointwise and output layers.
+ - He normal initialization for *all* layer kernels except those with sigmoid activations, which are initialized with Glorot normal.
+ - Convolutional downsampling and upsampling operations.
 
 ## Usage
-Dependencies are only supported for Python3 and can be found in `requirements.txt`. We use `numpy==1.15` for the bulk of preprocessing and `tensorflow==2.0.0-alpha0` for the model architecture, utilizing `tf.keras.Model` and `tf.keras.Layer` subclassing.
+Dependencies are only supported for Python3 and can be found in `requirements.txt` (`numpy==1.15` for preprocessing and `tensorflow==2.0.0-alpha0` for model architecture, utilizing `tf.keras.Model` and `tf.keras.Layer` subclassing).
 
 The `VolumetricCNN` model can be found in `model/model.py` and contains an `inference` mode in addition to the `training` mode that `tf.Keras.Model` supports.
  - Specify `training=False, inference=True` to only receive the decoder output, as desired in test time.
  - Specify `training=False, inference=False` to receive both the decoder and variational autoencoder output to be able to run loss and metrics, as desired in validation time.
 
 ### BraTS Data
-The BraTS 2017/2018 dataset is not publicly available, so we cannot provide download scripts for those. Once downloaded, run preprocessing on the original data format, which should look something like this:
+The BraTS 2017/2018 dataset is not publicly available, so download scripts for those are not available. Once downloaded, run preprocessing on the original data format, which should look something like this:
 ```
 BraTS17TrainingData/*/*/*[t1,t1ce,t2,flair,seg].nii.gz
 ```
 
 ### Preprocessing
-For each example, there are 4 modalities and 1 label, each of shape `240 x 240 x 155`. We slightly adjust the preprocessing steps described in the paper to match our use case with Stanford Medicine:
+For each example, there are 4 modalities and 1 label, each of shape `240 x 240 x 155`. Preprocessing steps consist of:
  - Concatenate the `t1ce` and `flair` modalities along the channel dimension.
  - Compute per-channel image-wise `mean` and `std` and normalize per channel *for the training set*.
  - Crop as much background as possible across all images. Final image sizes are `155 x 190 x 147`.
@@ -42,12 +36,12 @@ python preprocess.py --brats_folder data/BraTS17TrainingData --create_val
 
 > All command-line arguments can be found in `utils/arg_parser.py`.
 
-> There are 285 training examples in the BraTS 2017/2018 training sets, but since we do not have access to the validation set, we opt for a 10:1 split and end up with 260 and 25 training and validation examples, respectively. To create this split, run with the `--create_val` flag.
+> There are 285 training examples in the BraTS 2017/2018 training sets, but for lack of validation set, the `--create_val` flag creates a 10:1 split, resulting in 260 and 25 training and validation examples, respectively.
 
 ### Training
-As per the paper, we adopt all hyperparameters used in training (as default arguments). We will provide our training logs and graphs here shortly. See `scripts/train.sh` for a detailed example of how to run training. The size of the model can be adjusted in `utils/constants.py`. We randomly flip across spatial axes with probability 0.5 and sample 1 crop per example in training (essentially making the training data stochastic). The validation set is created at the beginning of training and remains static.
+All hyperparameters proposed in the paper are used in training. See `scripts/train.sh` for a detailed example of how to run training. The size of the model can be adjusted in `utils/constants.py`. The input is randomly flipped across spatial axes with probability 0.5 and cropped to `128 x 128 x 128` per example in training (essentially making the training data stochastic). The validation set is created at the beginning of training and remains static.
 ```
-python train.py --train_loc data/train.image_wise.tfrecords --val_loc data/val.image_wise.tfrecords
+python train.py --train_loc data/train.image_wise.tfrecords --val_loc data/val.image_wise.tfrecords --prepro_file data/image_mean_std.npy --args_file config.json
 ```
 
 > Use the `--n_val_sets` flag to specify how many crops to take to create the validation set. Increase for metric robustness.
@@ -82,5 +76,4 @@ We run training on a V100 32GB GPU. Each epoch takes around ~10 minutes to run. 
 |70   |24.800       |0.607              |27.082         |0.624                |
 
 ## TODO:
- - [ ] Add test-time implementation of normalizing all input images to `1 mm^3` voxel resolution.
  - [ ] Add preprocessing/training/inference on skull-stripping data for test cases.
