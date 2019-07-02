@@ -12,6 +12,7 @@ class VolumetricCNN(tf.keras.models.Model):
                  groups=8,
                  reduction=2,
                  l2_scale=1e-5,
+                 dropout=0.2,
                  downsampling='conv',
                  upsampling='conv',
                  base_filters=16,
@@ -30,6 +31,7 @@ class VolumetricCNN(tf.keras.models.Model):
                             groups=groups,
                             reduction=reduction,
                             l2_scale=l2_scale,
+                            dropout=dropout,
                             downsampling=downsampling,
                             base_filters=base_filters,
                             depth=depth)
