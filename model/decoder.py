@@ -49,8 +49,20 @@ class Decoder(tf.keras.layers.Layer):
                             data_format=data_format,
                             l2_scale=l2_scale)
             self.levels.append([upsample, res, conv])
+        
+        # Binary classification.
+        self.bin = tf.keras.layers.Conv3D(
+                                filters=1,
+                                kernel_size=1,
+                                strides=1,
+                                padding='same',
+                                activation='sigmoid',
+                                data_format=data_format,
+                                kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
+                                kernel_initializer='glorot_normal')
+        self.mask = tf.keras.layers.Multiply()
 
-        # Output layer convolution.
+        # Output multiclass classification.
         self.out = tf.keras.layers.Conv3D(
                                 filters=OUT_CH,
                                 kernel_size=1,
@@ -76,9 +88,13 @@ class Decoder(tf.keras.layers.Layer):
             # Pass through convolutional block.
             inputs = conv(inputs, training=training)
 
+        # Mask with binary classification.
+        binary = self.bin(inputs)
+        inputs = self.mask([binary, inputs])
+
         # Map convolution to number of classes.
         inputs = self.out(inputs)
-        return inputs
+        return inputs, binary
 
     def get_config(self):
         return self.config

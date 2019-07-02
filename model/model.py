@@ -56,10 +56,10 @@ class VolumetricCNN(tf.keras.models.Model):
             'Cannot run training and inference modes simultaneously.'
 
         inputs = self.encoder(inputs, training=training)
-        y_pred = self.decoder((inputs[-1], inputs[:-1]), training=training)
+        y_mul, y_bin = self.decoder((inputs[-1], inputs[:-1]), training=training)
 
         if inference:
-            return (y_pred, None, None, None)
+            return (y_mul, y_bin, None, None, None)
         y_vae, z_mean, z_logvar = self.vae(inputs[-1], training=training)
 
-        return (y_pred, y_vae, z_mean, z_logvar)
+        return (y_mul, y_bin, y_vae, z_mean, z_logvar)

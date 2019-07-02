@@ -189,13 +189,15 @@ class CustomLoss(tf.keras.losses.Loss):
         super(CustomLoss, self).__init__(**kwargs)
         self.l2_loss = L2Loss(name='l2', **kwargs)
         self.kl_loss = KullbackLeiblerLoss(name='kl', **kwargs)
-        self.dec_loss = DiceLoss(name='dice', **kwargs)
+        self.mul_loss = DiceLoss(name='dice_mul', **kwargs)
+        self.bin_loss = DiceLoss(name='dice_bin', **kwargs)
+        self.axis = -1 if data_format == 'channels_last' else 1
 
-    def __call__(self, x, y_true, y_pred, y_vae, z_mean, z_logvar, sample_weight=None):
-        n = tf.cast(tf.reduce_prod(x.shape), tf.float32)
-        return self.dec_loss(y_true, y_pred) + \
-                0.1 * self.l2_loss(x, y_vae) + \
-                0.1 / n * self.kl_distribution_loss(z_mean, z_logvar)
+    def __call__(self, X, y_muls, y_bins, y_vae, z_mean, z_logvar, sample_weight=None):
+        return self.mul_loss(*y_muls) + \
+               self.bin_loss(*y_bins) + \
+                0.1 * self.l2_loss(X, y_vae) + \
+                0.1 * self.kl_distribution_loss(z_mean, z_logvar)
 
     @staticmethod
     def kl_distribution_loss(mean, logvar):
