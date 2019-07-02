@@ -89,7 +89,9 @@ class ResnetBlock(tf.keras.layers.Layer):
                                 groups=groups,
                                 axis=-1 if data_format == 'channels_last' else 1,
                                 beta_initializer='zeros',
-                                gamma_initializer='ones'),
+                                gamma_initializer='ones',
+                                beta_regularizer=tf.keras.regularizers.l2(l=l2_scale),
+                                gamma_regularizer=tf.keras.regularizers.l2(l=l2_scale)),
                            tf.keras.layers.Activation('relu')])
         self.convs.append([tf.keras.layers.Conv3D(
                                 filters=filters,
@@ -103,7 +105,9 @@ class ResnetBlock(tf.keras.layers.Layer):
                                 groups=groups,
                                 axis=-1 if data_format == 'channels_last' else 1,
                                 beta_initializer='zeros',
-                                gamma_initializer='zeros'),
+                                gamma_initializer='zeros',
+                                beta_regularizer=tf.keras.regularizers.l2(l=l2_scale),
+                                gamma_regularizer=tf.keras.regularizers.l2(l=l2_scale)),
                            tf.keras.layers.Activation('relu')])
 
         self.residual = tf.keras.layers.Add()
