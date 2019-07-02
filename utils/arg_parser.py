@@ -42,8 +42,6 @@ def train_parser():
             help='Location of preprocessed validation data.')
     parser.add_argument('--prepro_loc', type=str, required=True,
             help='Location of preprocessed statistics.')
-    parser.add_argument('--n_val_sets', type=int, default=1,
-            help='Number of unique validation sets.')
 
     # Training.
     parser.add_argument('--log_file', type=str, default='train.log',

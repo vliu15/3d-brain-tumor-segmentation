@@ -49,19 +49,6 @@ def prepare_batch(X, y, data_format='channels_last'):
     return X, y_bin, y_mul
 
 
-def prepare_val_set(dataset, n_sets=1, data_format='channels_last'):
-    """Prepares validation sets (with cropping and flipping)."""
-    def parse_example(X, y):
-        return prepare_batch(X, y, data_format=data_format)
-    
-    # Sample arbitrary number of crops per validation example for robustness.
-    for i in range(n_sets):
-        if i == 0: val_set = dataset.map(parse_example)
-        else: val_set = val_set.concatenate(dataset.map(parse_example))
-
-    return val_set
-
-
 def prepare_dataset(path, batch_size, prepro_size, buffer_size=100, data_format='channels_last'):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
@@ -112,8 +99,6 @@ def train(args):
     val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
                                       (prepro_h, prepro_w, prepro_d), buffer_size=0,
                                       data_format=args.data_format)
-    val_data = prepare_val_set(val_data, n_sets=args.n_val_sets, data_format=args.data_format)
-    n_val *= args.n_val_sets
     print('{} training examples.'.format(n_train), flush=True)
     print('{} validation examples.'.format(n_val), flush=True)
 
@@ -190,10 +175,10 @@ def train(args):
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 train_loss.update_state(loss)
-                train_accu.update_state(y, y_pred_mul)
-                train_prec.update_state(y, y_pred_mul)
-                train_reca.update_state(y, y_pred_mul)
-                train_dice.update_state(y, y_pred_mul)
+                train_accu.update_state(y_mul, y_pred_mul)
+                train_prec.update_state(y_mul, y_pred_mul)
+                train_reca.update_state(y_mul, y_pred_mul)
+                train_dice.update_state(y_mul, y_pred_mul)
 
         print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
                Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
@@ -204,17 +189,18 @@ def train(args):
                                d=train_dice.result()), flush=True)
 
         # Validation epoch.
-        for step, (X, y_bin, y_mul) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
+        for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
+            X, y_bin, y_mul = prepare_batch(X, y, data_format=args.data_format)
             with tf.device(args.device):
                 # Forward and loss.
                 y_pred_mul, y_pred_bin, y_vae, z_mean, z_logvar = model(X, training=True, inference=False)
                 loss = loss_fn(X, (y_mul, y_pred_mul), (y_bin, y_pred_bin), y_vae, z_mean, z_logvar)
 
                 val_loss.update_state(loss)
-                val_accu.update_state(y, y_pred_mul)
-                val_prec.update_state(y, y_pred_mul)
-                val_reca.update_state(y, y_pred_mul)
-                val_dice.update_state(y, y_pred_mul)
+                val_accu.update_state(y_mul, y_pred_mul)
+                val_prec.update_state(y_mul, y_pred_mul)
+                val_reca.update_state(y_mul, y_pred_mul)
+                val_dice.update_state(y_mul, y_pred_mul)
 
         print('Validation. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
                Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
