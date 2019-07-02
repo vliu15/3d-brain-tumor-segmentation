@@ -60,7 +60,6 @@ class Decoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
                                 kernel_initializer='glorot_normal')
-        self.mask = tf.keras.layers.Multiply()
 
         # Output multiclass classification.
         self.out = tf.keras.layers.Conv3D(
@@ -72,6 +71,9 @@ class Decoder(tf.keras.layers.Layer):
                                 data_format=data_format,
                                 kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
                                 kernel_initializer='glorot_normal')
+
+        # Use binary segmentation mask to inform prediction.
+        self.mask = tf.keras.layers.Multiply()
 
     def call(self, inputs, training=None):
         inputs, residuals = inputs
@@ -90,10 +92,11 @@ class Decoder(tf.keras.layers.Layer):
 
         # Mask with binary classification.
         binary = self.bin(inputs)
-        inputs = self.mask([binary, inputs])
 
         # Map convolution to number of classes.
         inputs = self.out(inputs)
+
+        inputs = self.mask([inputs, binary])
         return inputs, binary
 
     def get_config(self):
