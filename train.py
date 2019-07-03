@@ -151,7 +151,7 @@ def train(args):
                                'val_dice'])
             f.write(header + '\n')
 
-    best_val_loss = float('inf')
+    best_val_dice = 0.0
     patience = 0
 
     # Train.
@@ -228,13 +228,13 @@ def train(args):
                 f.write(entry + '\n')
 
         # Checkpoint and patience.
-        if val_loss.result() < best_val_loss:
-            best_val_loss = val_loss.result()
+        if val_dice.result() > best_val_dice:
+            best_val_dice = val_dice.result()
             model.save_weights(args.save_file)
             patience = 0
             print('Saved model weights.')
         elif patience == args.patience:
-            print('Validation loss has not improved in {} epochs. Stopped training.'
+            print('Validation dice has not improved in {} epochs. Stopped training.'
                     .format(args.patience))
             return
         else:
