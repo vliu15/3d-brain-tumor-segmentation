@@ -11,6 +11,7 @@ class Encoder(tf.keras.layers.Layer):
                  groups=8,
                  reduction=2,
                  l2_scale=1e-5,
+                 dropout=0.2,
                  downsampling='conv',
                  base_filters=16,
                  depth=4):
@@ -33,6 +34,9 @@ class Encoder(tf.keras.layers.Layer):
 
         # Retrieve downsampling method.
         Downsample = get_downsampling(downsampling)
+
+        # Initial dropout layer (similar to denoised autoencoding).
+        self.dropout = tf.keras.layers.Dropout(rate=dropout)
 
         # Build layers at all spatial levels.
         self.levels = []
@@ -63,6 +67,9 @@ class Encoder(tf.keras.layers.Layer):
             self.levels.append([convs, concat, downsample])
 
     def call(self, inputs, training=None):
+        # Apply dropout.
+        inputs = self.dropout(inputs, training=training)
+
         residuals = []
 
         # Iterate through spatial levels.

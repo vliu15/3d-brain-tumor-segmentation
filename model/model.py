@@ -12,6 +12,7 @@ class VolumetricCNN(tf.keras.models.Model):
                  groups=8,
                  reduction=2,
                  l2_scale=1e-5,
+                 dropout=0.2,
                  downsampling='conv',
                  upsampling='conv',
                  base_filters=16,
@@ -30,6 +31,7 @@ class VolumetricCNN(tf.keras.models.Model):
                             groups=groups,
                             reduction=reduction,
                             l2_scale=l2_scale,
+                            dropout=dropout,
                             downsampling=downsampling,
                             base_filters=base_filters,
                             depth=depth)
@@ -56,10 +58,10 @@ class VolumetricCNN(tf.keras.models.Model):
             'Cannot run training and inference modes simultaneously.'
 
         inputs = self.encoder(inputs, training=training)
-        y_pred = self.decoder((inputs[-1], inputs[:-1]), training=training)
+        y_mul, y_bin = self.decoder((inputs[-1], inputs[:-1]), training=training)
 
         if inference:
-            return (y_pred, None, None, None)
+            return (y_mul, y_bin, None, None, None)
         y_vae, z_mean, z_logvar = self.vae(inputs[-1], training=training)
 
-        return (y_pred, y_vae, z_mean, z_logvar)
+        return (y_mul, y_bin, y_vae, z_mean, z_logvar)

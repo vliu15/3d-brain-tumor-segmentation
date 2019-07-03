@@ -41,21 +41,12 @@ def prepare_batch(X, y, data_format='channels_last'):
         if np.random.uniform() < 0.5:
             X = tf.reverse(X, axis=[axis])
             y = tf.reverse(y, axis=[axis])
-        
-    return X, y
 
+    # Split binary and multiclass labels.
+    y_bin, y_mul = tf.split(y, [1, 3], axis=channel_axis)
+    y_bin = 1.0 - y_bin
 
-def prepare_val_set(dataset, n_sets=1, data_format='channels_last'):
-    """Prepares validation sets (with cropping and flipping)."""
-    def parse_example(X, y):
-        return prepare_batch(X, y, data_format=data_format)
-    
-    # Sample arbitrary number of crops per validation example for robustness.
-    for i in range(n_sets):
-        if i == 0: val_set = dataset.map(parse_example)
-        else: val_set = val_set.concatenate(dataset.map(parse_example))
-
-    return val_set
+    return X, y_bin, y_mul
 
 
 def prepare_dataset(path, batch_size, prepro_size, buffer_size=100, data_format='channels_last'):
@@ -66,7 +57,6 @@ def prepare_dataset(path, batch_size, prepro_size, buffer_size=100, data_format=
         y = tf.reshape(parsed['y'], (h, w, d, 1))
         y = tf.squeeze(tf.cast(y, tf.int32), axis=-1)
         y = tf.one_hot(y, OUT_CH+1, axis=-1, dtype=tf.float32)
-        y = y[:, :, :, 1:]
 
         if data_format == 'channels_first':
             X = tf.transpose(X, (3, 0, 1, 2))
@@ -109,8 +99,6 @@ def train(args):
     val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
                                       (prepro_h, prepro_w, prepro_d), buffer_size=0,
                                       data_format=args.data_format)
-    val_data = prepare_val_set(val_data, n_sets=args.n_val_sets, data_format=args.data_format)
-    n_val *= args.n_val_sets
     print('{} training examples.'.format(n_train), flush=True)
     print('{} validation examples.'.format(n_val), flush=True)
 
@@ -163,7 +151,7 @@ def train(args):
                                'val_dice'])
             f.write(header + '\n')
 
-    best_val_loss = float('inf')
+    best_val_dice = 0.0
     patience = 0
 
     # Train.
@@ -174,12 +162,12 @@ def train(args):
 
         # Training epoch.
         for step, (X, y) in tqdm(enumerate(train_data, 1), total=n_train, desc='Training      '):
-            X, y = prepare_batch(X, y, data_format=args.data_format)
+            X, y_bin, y_mul = prepare_batch(X, y, data_format=args.data_format)
             with tf.device(args.device):
                 # Forward and loss.
                 with tf.GradientTape() as tape:
-                    y_pred, y_vae, z_mean, z_logvar = model(X, training=True, inference=False)
-                    loss = loss_fn(X, y, y_pred, y_vae, z_mean, z_logvar)
+                    y_pred_mul, y_pred_bin, y_vae, z_mean, z_logvar = model(X, training=True, inference=False)
+                    loss = loss_fn(X, (y_mul, y_pred_mul), (y_bin, y_pred_bin), y_vae, z_mean, z_logvar)
                     loss += tf.reduce_sum(model.losses)
 
                 # Gradients and backward.
@@ -187,10 +175,10 @@ def train(args):
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 train_loss.update_state(loss)
-                train_accu.update_state(y, y_pred)
-                train_prec.update_state(y, y_pred)
-                train_reca.update_state(y, y_pred)
-                train_dice.update_state(y, y_pred)
+                train_accu.update_state(y_mul, y_pred_mul)
+                train_prec.update_state(y_mul, y_pred_mul)
+                train_reca.update_state(y_mul, y_pred_mul)
+                train_dice.update_state(y_mul, y_pred_mul)
 
         print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
                Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
@@ -202,16 +190,17 @@ def train(args):
 
         # Validation epoch.
         for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
+            X, y_bin, y_mul = prepare_batch(X, y, data_format=args.data_format)
             with tf.device(args.device):
                 # Forward and loss.
-                y_pred, y_vae, z_mean, z_logvar = model(X, training=False, inference=False)
-                loss = loss_fn(X, y, y_pred, y_vae, z_mean, z_logvar)
+                y_pred_mul, y_pred_bin, y_vae, z_mean, z_logvar = model(X, training=True, inference=False)
+                loss = loss_fn(X, (y_mul, y_pred_mul), (y_bin, y_pred_bin), y_vae, z_mean, z_logvar)
 
                 val_loss.update_state(loss)
-                val_accu.update_state(y, y_pred)
-                val_prec.update_state(y, y_pred)
-                val_reca.update_state(y, y_pred)
-                val_dice.update_state(y, y_pred)
+                val_accu.update_state(y_mul, y_pred_mul)
+                val_prec.update_state(y_mul, y_pred_mul)
+                val_reca.update_state(y_mul, y_pred_mul)
+                val_dice.update_state(y_mul, y_pred_mul)
 
         print('Validation. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
                Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
@@ -239,13 +228,13 @@ def train(args):
                 f.write(entry + '\n')
 
         # Checkpoint and patience.
-        if val_loss.result() < best_val_loss:
-            best_val_loss = val_loss.result()
+        if val_dice.result() > best_val_dice:
+            best_val_dice = val_dice.result()
             model.save_weights(args.save_file)
             patience = 0
             print('Saved model weights.')
         elif patience == args.patience:
-            print('Validation loss has not improved in {} epochs. Stopped training.'
+            print('Validation dice has not improved in {} epochs. Stopped training.'
                     .format(args.patience))
             return
         else:
