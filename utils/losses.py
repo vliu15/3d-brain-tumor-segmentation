@@ -201,4 +201,4 @@ class CustomLoss(tf.keras.losses.Loss):
 
     @staticmethod
     def kl_distribution_loss(mean, logvar):
-        return tf.reduce_sum(mean ** 2 + tf.math.exp(logvar) - logvar - 1)
+        return tf.reduce_mean(mean ** 2 + tf.math.exp(logvar) - logvar - 1)

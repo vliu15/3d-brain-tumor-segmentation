@@ -10,7 +10,7 @@ class Encoder(tf.keras.layers.Layer):
                  data_format='channels_last',
                  groups=8,
                  reduction=2,
-                 l2_scale=1e-5
+                 l2_scale=1e-5,
                  dropout=0.2,
                  downsampling='conv',
                  base_filters=16,

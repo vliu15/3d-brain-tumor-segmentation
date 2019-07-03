@@ -72,9 +72,6 @@ class Decoder(tf.keras.layers.Layer):
                                 kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
                                 kernel_initializer='glorot_normal')
 
-        # Use binary segmentation mask to inform prediction.
-        self.mask = tf.keras.layers.Multiply()
-
     def call(self, inputs, training=None):
         inputs, residuals = inputs
         # Iterate through spatial levels.
@@ -96,7 +93,6 @@ class Decoder(tf.keras.layers.Layer):
         # Map convolution to number of classes.
         inputs = self.out(inputs)
 
-        inputs = self.mask([inputs, binary])
         return inputs, binary
 
     def get_config(self):
