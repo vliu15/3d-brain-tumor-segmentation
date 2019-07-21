@@ -1,12 +1,12 @@
 """Contains custom models for 3D semantic segmentation."""
 import tensorflow as tf
 
-from model.encoder import Encoder
-from model.decoder import Decoder
-from model.variational_autoencoder import VariationalAutoencoder
+from layers.encoder import Encoder
+from layers.decoder import Decoder
+from layers.vae import VariationalAutoencoder
 
 
-class VolumetricCNN(tf.keras.models.Model):
+class Model(tf.keras.models.Model):
     def __init__(self,
                  data_format='channels_last',
                  groups=8,
@@ -16,15 +16,17 @@ class VolumetricCNN(tf.keras.models.Model):
                  downsampling='conv',
                  upsampling='conv',
                  base_filters=16,
-                 depth=4):
-        """ Initializes the VolumetricCNN model, a cross between the 3D U-net
+                 depth=4,
+                 in_ch=2,
+                 out_ch=3):
+        """ Initializes the model, a cross between the 3D U-net
             and 2018 BraTS Challenge top model with VAE regularization.
 
             References:
                 - [3D U-Net: Learning Dense Volumetric Segmentation from Sparse Annotation](https://arxiv.org/pdf/1606.06650.pdf)
                 - [3D MRI brain tumor segmentation using autoencoder regularization](https://arxiv.org/pdf/1810.11654.pdf)
         """
-        super(VolumetricCNN, self).__init__()
+        super(Model, self).__init__()
         self.epoch = tf.Variable(0, name='epoch', trainable=False)
         self.encoder = Encoder(
                             data_format=data_format,
@@ -42,7 +44,8 @@ class VolumetricCNN(tf.keras.models.Model):
                             l2_scale=l2_scale,
                             upsampling=upsampling,
                             base_filters=base_filters,
-                            depth=depth)
+                            depth=depth,
+                            out_ch=out_ch)
         self.vae = VariationalAutoencoder(
                             data_format=data_format,
                             groups=groups,
@@ -50,7 +53,8 @@ class VolumetricCNN(tf.keras.models.Model):
                             l2_scale=l2_scale,
                             upsampling=upsampling,
                             base_filters=base_filters,
-                            depth=depth)
+                            depth=depth,
+                            out_ch=in_ch)
 
     def call(self, inputs, training=None, inference=None):
         # Inference mode does not evaluate VAE branch.
@@ -58,10 +62,10 @@ class VolumetricCNN(tf.keras.models.Model):
             'Cannot run training and inference modes simultaneously.'
 
         inputs = self.encoder(inputs, training=training)
-        y_mul, y_bin = self.decoder((inputs[-1], inputs[:-1]), training=training)
+        y_pred = self.decoder((inputs[-1], inputs[:-1]), training=training)
 
         if inference:
-            return (y_mul, y_bin, None, None, None)
+            return (y_pred, None, None, None)
         y_vae, z_mean, z_logvar = self.vae(inputs[-1], training=training)
 
-        return (y_mul, y_bin, y_vae, z_mean, z_logvar)
+        return (y_pred, y_vae, z_mean, z_logvar)

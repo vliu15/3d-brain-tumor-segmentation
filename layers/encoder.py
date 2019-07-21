@@ -1,8 +1,8 @@
 """Contains custom convolutional encoder class."""
 import tensorflow as tf
 
-from model.layer_utils.resnet import ResnetBlock
-from model.layer_utils.downsample import get_downsampling
+from layers.resnet import ResnetBlock
+from layers.downsample import get_downsampling
 
 
 class Encoder(tf.keras.layers.Layer):

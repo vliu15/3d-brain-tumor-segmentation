@@ -1,7 +1,7 @@
 """Contains custom downsampling classes."""
 import tensorflow as tf
 
-from model.layer_utils.group_norm import GroupNormalization
+from layers.group_norm import GroupNormalization
 
 
 def get_downsampling(downsampling):

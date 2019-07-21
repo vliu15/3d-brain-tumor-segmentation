@@ -1,7 +1,6 @@
 # Custom output files
 data/
-*.hdf5
-script.sh
+checkpoint*/
 *.out
 
 # Byte-compiled / optimized / DLL files

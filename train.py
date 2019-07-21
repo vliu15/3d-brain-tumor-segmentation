@@ -1,154 +1,129 @@
 """Contains training loops."""
+import os
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 
-from utils.arg_parser import train_parser
-from utils.losses import CustomLoss
-from utils.metrics import DiceCoefficient
-from utils.optimizer import ScheduledAdam
-from utils.constants import *
-from model.model import VolumetricCNN
+from args import TrainArgParser
+from util import DiceVAELoss, DiceCoefficient, ScheduledOptim
+from model import Model
 
 
-def prepare_batch(X, y, data_format='channels_last'):
-    """Performs data augmentation in training."""
-    spatial_axes = [1, 2, 3] if data_format == 'channels_last' else [2, 3, 4]
-    channel_axis = -1 if data_format == 'channels_last' else 1
-
-    # Apply random intensity shift.
-    _, var = tf.nn.moments(X, axes=spatial_axes, keepdims=True)
-    shift = np.random.uniform()
-    scale = np.random.uniform()
-    X += (0.2 * shift - 0.1) * tf.sqrt(var)
-    X *= 0.2 * scale + 0.9
-
-    # Sample corner point.
-    h = np.random.randint(low=H, high=X.shape[spatial_axes[0]])
-    w = np.random.randint(low=W, high=X.shape[spatial_axes[1]])
-    d = np.random.randint(low=D, high=X.shape[spatial_axes[2]])
-
-    # Create crop.
-    if data_format == 'channels_last':
-        X = X[:, h-H:h, w-W:w, d-D:d, :]
-        y = y[:, h-H:h, w-W:w, d-D:d, :]
-    else:
-        X = X[:, :, h-H:h, w-W:w, d-D:d]
-        y = y[:, :, h-H:h, w-W:w, d-D:d]
-
-    # Randomly flip across each axis.
-    for axis in spatial_axes:
-        if np.random.uniform() < 0.5:
-            X = tf.reverse(X, axis=[axis])
-            y = tf.reverse(y, axis=[axis])
-
-    # Split binary and multiclass labels.
-    y_bin, y_mul = tf.split(y, [1, 3], axis=channel_axis)
-    y_bin = 1.0 - y_bin
-
-    return X, y_bin, y_mul
-
-
-def prepare_dataset(path, batch_size, prepro_size, buffer_size=100, data_format='channels_last'):
+def prepare_dataset(loc, batch_size, prepro_size, crop_size, out_ch, shuffle=True, data_format='channels_last'):
     """Returns a BatchDataset object containing loaded data."""
     def parse_example(example_proto):
+        # Parse examples.
         parsed = tf.io.parse_single_example(example_proto, example_desc)
-        X = tf.reshape(parsed['X'], (h, w, d, IN_CH))
+        x = tf.reshape(parsed['x'], (h, w, d, c))
         y = tf.reshape(parsed['y'], (h, w, d, 1))
+
+        # Apply random intensity shift.
+        _, var = tf.nn.moments(x, axes=(0, 1, 2), keepdims=True)
+        shift = tf.random.uniform((c,), -0.1, 0.1)
+        scale = tf.random.uniform((c,), 0.9, 1.1)
+        x += shift * tf.sqrt(var)
+        x *= scale
+
+        # Create random crop.
+        xy = tf.concat([x, y], axis=-1)
+        xy = tf.image.random_crop(xy, crop_size + [c+1])
+
+        # Randomly flip across each axis.
+        for axis in (0, 1, 2):
+            xy = tf.cond(
+                    tf.random.uniform(()) > 0.5,
+                    lambda: tf.reverse(xy, axis=[axis]),
+                    lambda: xy)
+
+        x, y = tf.split(xy, [c, 1], axis=-1)
+        
+        # Convert labels into one-hot encodings.
         y = tf.squeeze(tf.cast(y, tf.int32), axis=-1)
-        y = tf.one_hot(y, OUT_CH+1, axis=-1, dtype=tf.float32)
+        y = tf.one_hot(y, out_ch+1, axis=-1, dtype=tf.float32)
+        _, y = tf.split(y, [1, out_ch], axis=-1)
 
         if data_format == 'channels_first':
-            X = tf.transpose(X, (3, 0, 1, 2))
+            x = tf.transpose(x, (3, 0, 1, 2))
             y = tf.transpose(y, (3, 0, 1, 2))
 
-        return (X, y)
+        return (x, y)
 
-    h, w, d = prepro_size
+    h, w, d, c = prepro_size
 
     example_desc = {
-        'X': tf.io.FixedLenFeature([h * w * d * IN_CH], tf.float32),
+        'x': tf.io.FixedLenFeature([h * w * d * c], tf.float32),
         'y': tf.io.FixedLenFeature([h * w * d * 1], tf.float32)}
 
-    dataset = tf.data.TFRecordDataset(path)
-    dataset_len = sum(batch_size for _ in dataset)
+    files = [os.path.join(loc, f) for f in os.listdir(loc)]
+    dataset = tf.data.TFRecordDataset(files)
 
     # Shuffle for training set, else no shuffle for validation set.
-    if buffer_size:
-        dataset = (dataset.map(parse_example)
-                          .shuffle(buffer_size)
-                          .batch(batch_size))
-    else:
-        dataset = (dataset.map(parse_example)
-                          .batch(batch_size))
+    if shuffle:
+        dataset = dataset.shuffle(buffer_size=len(files))
+
+    dataset = (dataset.map(map_func=parse_example, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+                      .batch(batch_size=batch_size)
+                      .prefetch(buffer_size=tf.data.experimental.AUTOTUNE))
     
-    return dataset, dataset_len
+    return dataset, len(files)
 
 
 def train(args):
-    # Load preprocessing crop stats.
-    prepro = np.load(args.prepro_loc).item()
-    prepro_h = prepro['h_max'] - prepro['h_min']
-    prepro_w = prepro['w_max'] - prepro['w_min']
-    prepro_d = prepro['d_max'] - prepro['d_min']
-
     # Load data.
-    train_data, n_train = prepare_dataset(args.train_loc, args.batch_size,
-                                          (prepro_h, prepro_w, prepro_d), buffer_size=260,
-                                          data_format=args.data_format)
-    val_data, n_val = prepare_dataset(args.val_loc, args.batch_size,
-                                      (prepro_h, prepro_w, prepro_d), buffer_size=0,
-                                      data_format=args.data_format)
+    train_data, n_train = prepare_dataset(
+                                args.train_loc,
+                                args.batch_size,
+                                args.prepro_size,
+                                args.crop_size,
+                                args.model_args['out_ch'],
+                                shuffle=True,
+                                data_format=args.data_format)
+    val_data, n_val = prepare_dataset(
+                                args.val_loc,
+                                args.batch_size,
+                                args.prepro_size,
+                                args.crop_size,
+                                args.model_args['out_ch'],
+                                shuffle=False,
+                                data_format=args.data_format)
     print('{} training examples.'.format(n_train), flush=True)
     print('{} validation examples.'.format(n_val), flush=True)
 
     # Initialize model.
-    model = VolumetricCNN(**args.model_args)
-    _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
-                                    else (1, IN_CH, H, W, D)))
+    in_ch = args.prepro_size[-1]
+    model = Model(**args.model_args)
+    _ = model(tf.zeros(shape=[1] + args.crop_size + [in_ch] if args.data_format == 'channels_last' \
+                                    else [1, in_ch] + args.crop_size))
     
     # Load weights if specified.
-    if args.load_file:
-        model.load_weights(args.load_file)
+    if args.load_folder:
+        model.load_weights(os.path.join(args.load_folder, 'chkpt.hdf5'))
     n_params = tf.reduce_sum([tf.reduce_prod(var.shape) for var in model.trainable_variables])
     print('Total number of parameters: {}'.format(n_params), flush=True)
 
-    optimizer = ScheduledAdam(learning_rate=args.lr)
-
     # Initialize loss and metrics.
-    loss_fn = CustomLoss(data_format=args.data_format)
+    optimizer = ScheduledOptim(learning_rate=args.lr)
+    loss_fn = DiceVAELoss(data_format=args.data_format)
+    dice_fn = DiceCoefficient(data_format=args.data_format)
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
-    train_accu = tf.keras.metrics.BinaryAccuracy(name='train_accu')
-    train_prec = tf.keras.metrics.Precision(name='train_prec')
-    train_reca = tf.keras.metrics.Recall(name='train_reca')
-    train_dice = DiceCoefficient(name='train_dice', data_format=args.data_format)
-
+    train_macro_dice = tf.keras.metrics.Mean(name='train_macro_dice')
+    train_micro_dice = tf.keras.metrics.Mean(name='train_micro_dice')
     val_loss = tf.keras.metrics.Mean(name='val_loss')
-    val_accu = tf.keras.metrics.BinaryAccuracy(name='val_accu')
-    val_prec = tf.keras.metrics.Precision(name='val_prec')
-    val_reca = tf.keras.metrics.Recall(name='val_reca')
-    val_dice = DiceCoefficient(name='val_dice', data_format=args.data_format)
-
-    # Load model weights if specified.
-    if args.load_file:
-        model.load_weights(args.load_file)
+    val_macro_dice = tf.keras.metrics.Mean(name='val_macro_dice')
+    val_micro_dice = tf.keras.metrics.Mean(name='val_micro_dice')
     
     # Set up logging.
-    if args.log_file:
-        with open(args.log_file, 'w') as f:
+    if args.save_folder:
+        with open(os.path.join(args.save_folder, 'train.log'), 'w') as f:
             header = ','.join(['epoch',
                                'lr',
                                'train_loss',
-                               'train_accu',
-                               'train_prec',
-                               'train_reca',
-                               'train_dice',
+                               'train_macro_dice',
+                               'train_micro_dice',
                                'val_loss',
-                               'val_accu',
-                               'val_prec',
-                               'val_reca',
-                               'val_dice'])
+                               'val_macro_dice',
+                               'val_micro_dice'])
             f.write(header + '\n')
 
     best_val_dice = 0.0
@@ -160,100 +135,85 @@ def train(args):
         model.epoch.assign(epoch)
         optimizer(epoch=epoch)
 
-        # Training epoch.
-        for step, (X, y) in tqdm(enumerate(train_data, 1), total=n_train, desc='Training      '):
-            X, y_bin, y_mul = prepare_batch(X, y, data_format=args.data_format)
-            with tf.device(args.device):
+        with tf.device(args.device):
+            # Training epoch.
+            for x, y in tqdm(train_data, total=n_train, desc='Training      '):
                 # Forward and loss.
                 with tf.GradientTape() as tape:
-                    y_pred_mul, y_pred_bin, y_vae, z_mean, z_logvar = model(X, training=True, inference=False)
-                    loss = loss_fn(X, (y_mul, y_pred_mul), (y_bin, y_pred_bin), y_vae, z_mean, z_logvar)
+                    y_pred, y_vae, z_mean, z_logvar = model(x, training=True, inference=False)
+                    loss = loss_fn(x, y, y_pred, y_vae, z_mean, z_logvar)
                     loss += tf.reduce_sum(model.losses)
+
+                macro_dice, micro_dice = dice_fn(y, y_pred)
 
                 # Gradients and backward.
                 grads = tape.gradient(loss, model.trainable_variables)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
+                # Update logs.
                 train_loss.update_state(loss)
-                train_accu.update_state(y_mul, y_pred_mul)
-                train_prec.update_state(y_mul, y_pred_mul)
-                train_reca.update_state(y_mul, y_pred_mul)
-                train_dice.update_state(y_mul, y_pred_mul)
+                train_macro_dice.update_state(macro_dice)
+                train_micro_dice.update_state(micro_dice)
 
-        print('Training. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
-               Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
-                       .format(l=train_loss.result(),
-                               v=train_accu.result(),
-                               p=train_prec.result(),
-                               r=train_reca.result(),
-                               d=train_dice.result()), flush=True)
+            print('Training. Loss: {l: .4f}, Macro Dice: {d1: 1.4f}, Micro Dice: {d2: 1.4f}.'
+                        .format(l=train_loss.result(),
+                                d1=train_macro_dice.result(),
+                                d2=train_micro_dice.result()), flush=True)
 
-        # Validation epoch.
-        for step, (X, y) in tqdm(enumerate(val_data), total=n_val, desc='Validation    '):
-            X, y_bin, y_mul = prepare_batch(X, y, data_format=args.data_format)
-            with tf.device(args.device):
+            # Validation epoch.
+            for x, y in tqdm(val_data, total=n_val, desc='Validation    '):
                 # Forward and loss.
-                y_pred_mul, y_pred_bin, y_vae, z_mean, z_logvar = model(X, training=True, inference=False)
-                loss = loss_fn(X, (y_mul, y_pred_mul), (y_bin, y_pred_bin), y_vae, z_mean, z_logvar)
+                y_pred, y_vae, z_mean, z_logvar = model(x, training=False, inference=False)
+                loss = loss_fn(x, y, y_pred, y_vae, z_mean, z_logvar)
+                macro_dice, micro_dice = dice_fn(y, y_pred)
 
                 val_loss.update_state(loss)
-                val_accu.update_state(y_mul, y_pred_mul)
-                val_prec.update_state(y_mul, y_pred_mul)
-                val_reca.update_state(y_mul, y_pred_mul)
-                val_dice.update_state(y_mul, y_pred_mul)
+                val_macro_dice.update_state(macro_dice)
+                val_micro_dice.update_state(micro_dice)
 
-        print('Validation. Loss: {l: .4f}, Accu: {v: 1.4f}, Prec: {p: 1.4f}, \
-               Reca: {r: 1.4f}, Dice: {d: 1.4f}.'
-                       .format(l=val_loss.result(),
-                               v=val_accu.result(),
-                               p=val_prec.result(),
-                               r=val_reca.result(),
-                               d=val_dice.result()), flush=True)
+            print('Validation. Loss: {l: .4f}, Macro Dice: {d1: 1.4f}, Micro Dice: {d2: 1.4f}.'
+                        .format(l=val_loss.result(),
+                                d1=val_macro_dice.result(),
+                                d2=val_micro_dice.result()), flush=True)
 
         # Write logs.
-        if args.log_file:
-            with open(args.log_file, 'a') as f:
+        if args.save_folder:
+            with open(os.path.join(args.save_folder, 'train.log'), 'a') as f:
                 entry = ','.join([str(epoch),
                                   str(optimizer.learning_rate.numpy()),
                                   str(train_loss.result().numpy()),
-                                  str(train_accu.result().numpy()),
-                                  str(train_prec.result().numpy()),
-                                  str(train_reca.result().numpy()),
-                                  str(train_dice.result().numpy()),
+                                  str(train_macro_dice.result().numpy()),
+                                  str(train_micro_dice.result().numpy()),
                                   str(val_loss.result().numpy()),
-                                  str(val_accu.result().numpy()),
-                                  str(val_prec.result().numpy()),
-                                  str(val_reca.result().numpy()),
-                                  str(val_dice.result().numpy())])
+                                  str(val_macro_dice.result().numpy()),
+                                  str(val_micro_dice.result().numpy())])
                 f.write(entry + '\n')
 
         # Checkpoint and patience.
-        if val_dice.result() > best_val_dice:
-            best_val_dice = val_dice.result()
-            model.save_weights(args.save_file)
+        if val_macro_dice.result() > best_val_dice:
+            best_val_dice = val_macro_dice.result()
             patience = 0
-            print('Saved model weights.')
+            if args.save_folder:
+                model.save_weights(os.path.join(args.save_folder, 'chkpt.hdf5'))
+            print('Saved model weights.', flush=True)
         elif patience == args.patience:
             print('Validation dice has not improved in {} epochs. Stopped training.'
-                    .format(args.patience))
+                    .format(args.patience), flush=True)
             return
         else:
             patience += 1
 
         # Reset statistics.
         train_loss.reset_states()
-        train_accu.reset_states()
-        train_prec.reset_states()
-        train_reca.reset_states()
-        train_dice.reset_states()
+        train_macro_dice.reset_states()
+        train_micro_dice.reset_states()
         val_loss.reset_states()
-        val_accu.reset_states()
-        val_prec.reset_states()
-        val_reca.reset_states()
-        val_dice.reset_states()
+        val_macro_dice.reset_states()
+        val_micro_dice.reset_states()
 
 
 if __name__ == '__main__':
-    args = train_parser()
+    parser = TrainArgParser()
+    args = parser.parse_args()
     print('Train args: {}'.format(args), flush=True)
     train(args)

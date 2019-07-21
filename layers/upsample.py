@@ -1,7 +1,7 @@
 """Contains custom upsampling classes."""
 import tensorflow as tf
 
-from model.layer_utils.group_norm import GroupNormalization
+from layers.group_norm import GroupNormalization
 
 
 def get_upsampling(upsampling):

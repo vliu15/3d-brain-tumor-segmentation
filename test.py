@@ -1,17 +1,17 @@
 """Contains inference script for generating segmentation mask."""
 import os
 import glob
-import tensorflow as tf
-import numpy as np
-import scipy
-import nibabel as nib
-from tqdm import tqdm
 import random
+import scipy
+import numpy as np
+import nibabel as nib
+import tensorflow as tf
+from tqdm import tqdm
 from scipy.ndimage import zoom
 
-from utils.arg_parser import test_parser
-from utils.constants import *
-from model.model import VolumetricCNN
+from args import TestArgParser
+from util import DiceCoefficient
+from model import Model
 
 
 class Interpolator(object):
@@ -20,15 +20,15 @@ class Interpolator(object):
         self.order = order
         self.mode = mode
 
-    def __call__(self, subject_folder):
+    def __call__(self, path, modalities):
         """Extracts Numpy image and normalizes it to 1 mm^3."""
         # Extract raw images from each.
         image = []
         pixdim = []
         affine = []
         
-        for name in BRATS_MODALITIES:
-            file_card = glob.glob(os.path.join(subject_folder, '*' + name + '*' + '.nii' + '*'))[0]
+        for name in modalities:
+            file_card = glob.glob(os.path.join(path, '*' + name + '*' + '.nii' + '*'))[0]
             img = nib.load(file_card)
 
             array.append(np.array(img.dataobj).astype(np.float32))
@@ -111,16 +111,17 @@ class Generator(object):
 
 
 class Segmentor(object):
-    def __init__(self, model, data_format, threshold=0.5, **kwargs):
+    def __init__(self, model, data_format, out_ch, threshold=0.5, **kwargs):
         self.model = model
         self.data_format = data_format
         self.threshold = threshold
+        self.out_ch = out_ch
 
     def __call__(self, image, generator):
         if self.data_format == 'channels_last':
-            output = np.zeros(shape=list(image.shape[:-1]) + [OUT_CH], dtype=np.float32)
+            output = np.zeros(shape=list(image.shape[:-1]) + [self.out_ch], dtype=np.float32)
         else:
-            output = np.zeros(shape=[OUT_CH] + list(image.shape[1:]), dtype=np.float32)
+            output = np.zeros(shape=[self.out_ch] + list(image.shape[1:]), dtype=np.float32)
 
         for batch, idxs in generator(image):
             # Generate predictions.
@@ -162,55 +163,30 @@ class Segmentor(object):
         return output
 
 
-def dice_coefficient(y_true, y_pred, eps=1.0):
-    """Returns dice coefficient of one prediction."""
-    # Calculate mask for label 1.
-    true_ones = tf.cast(tf.equal(y_true, 1), tf.float32)
-    pred_ones = tf.cast(tf.equal(y_pred, 1), tf.float32)
-
-    # Calculate mask for label 2.
-    true_twos = tf.cast(tf.equal(y_true, 2), tf.float32)
-    pred_twos = tf.cast(tf.equal(y_pred, 2), tf.float32)
-
-    # Calculate mask for label 4.
-    true_fours = tf.cast(tf.equal(y_true, 4), tf.float32)
-    pred_fours = tf.cast(tf.equal(y_pred, 4), tf.float32)
-
-    # Calculate mask for all positives.
-    true_all = tf.cast(y_true > 0, tf.float32)
-    pred_all = tf.cast(y_pred > 0, tf.float32)
-
-    # Calculate per-label dice scores.
-    dice_ones = (tf.reduce_sum(true_ones * pred_ones) + eps) / (tf.reduce_sum(true_ones + pred_ones) + eps)
-    dice_twos = (tf.reduce_sum(true_twos * pred_twos) + eps) / (tf.reduce_sum(true_twos + pred_twos) + eps)
-    dice_fours = (tf.reduce_sum(true_fours * pred_fours) + eps) / (tf.reduce_sum(true_fours + pred_fours) + eps)
-
-    # Calculated macro- and micro- dice scores.
-    dice_macro = tf.reduce_mean([dice_ones, dice_twos, dice_fours])
-    dice_micro = (tf.reduce_sum(true_all * pred_all) + eps) / (tf.reduce_sum(true_all + pred_all) + eps)
-    
-    return dice_macro, dice_micro
-
-
 def main(args):
     # Initialize.
-    data = np.load(args.prepro_file).item()
-    voxel_mean = tf.convert_to_tensor(data['mean'], dtype=tf.float32)
-    voxel_std = tf.convert_to_tensor(data['std'], dtype=tf.float32)
+    mean = tf.convert_to_tensor(args.prepro_stats['norm']['mean'])
+    std = tf.convert_to_tensor(args.prepro_stats['norm']['std'])
     
-    # Initialize model.
-    model = VolumetricCNN(**args.model_args)
+    # Initialize model(s) and load weights.
+    in_ch = len(args.modalities)
+    tumor_model = Model(**args.tumor_model_args)
+    _ = tumor_model(tf.zeros(shape=[1] + args.crop_size + [in_ch] if args.data_format == 'channels_last' \
+                                    else [1, in_ch] + args.crop_size, dtype=tf.float32))
+    tumor_model.load_weights(os.path.join(args.tumor_model, 'chkpt.hdf5'))
 
-    # Build model with initial forward pass.
-    _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
-                                    else (1, IN_CH, H, W, D), dtype=tf.float32))
-    # Load weights.
-    model.load_weights(args.chkpt_file)
+    if args.skull_model:
+        skull_model = Model(**args.skull_model_args)
+        _ = model(tf.zeros(shape=[1] + args.crop_size + [in_ch] if args.data_format == 'channels_last' \
+                                    else [1, in_ch] + args.crop_size, dtype=tf.float32))
+        skull_model.load_weights(os.path.join(args.skull_model, 'chkpt.hdf5'))
 
     # Initialize interpolator, generator, and segmentor.
-    interpolator = Interpolator(args.model_args.data_format, order=args.order, mode=args.mode)
-    generator = Generator(args.model_args.data_format, args.batch_size, stride=args.stride)
-    segmentor = Segmentor(model, args.model_args.data_format, threshold=args.threshold)
+    interpolator = Interpolator(order=args.order, mode=args.mode)
+    skull_generator = Generator(args.skull_model_args['data_format'], args.batch_size, stride=args.stride)
+    skull_segmentor = Segmentor(model, args.skull_model_args['data_format'], threshold=args.threshold)
+    tumor_generator = Generator(args.tumor_model_args['data_format'], args.batch_size, stride=args.stride)
+    tumor_segmentor = Segmentor(model, args.tumor_model_args['data_format'], threshold=args.threshold)
 
     # Loop through each patient.
     for subject_folder in tqdm(glob.glob(os.path.join(args.test_folder, '*'))):

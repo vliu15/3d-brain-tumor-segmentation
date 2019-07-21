@@ -1,7 +1,7 @@
 """Contains ResNet block class."""
 import tensorflow as tf
 
-from model.layer_utils.group_norm import GroupNormalization
+from layers.group_norm import GroupNormalization
 
 
 class ResnetBlock(tf.keras.layers.Layer):

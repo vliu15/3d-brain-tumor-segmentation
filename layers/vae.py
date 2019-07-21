@@ -1,10 +1,9 @@
 """Contains custom variational autoencoder class."""
 import tensorflow as tf
 
-from model.layer_utils.downsample import get_downsampling
-from model.layer_utils.upsample import get_upsampling
-from model.layer_utils.resnet import ResnetBlock
-from utils.constants import *
+from layers.downsample import get_downsampling
+from layers.upsample import get_upsampling
+from layers.resnet import ResnetBlock
 
 
 def sample(inputs):
@@ -23,7 +22,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                  downsampling='conv',
                  upsampling='conv',
                  base_filters=16,
-                 depth=4):
+                 depth=4,
+                 out_ch=2):
         """ Initializes the variational autoencoder: consists of sampling
             then an alternating series of SENet blocks and upsampling.
 
@@ -40,7 +40,8 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
                             'downsampling': downsampling,
                             'upsampling': upsampling,
                             'base_filters': base_filters,
-                            'depth': depth})
+                            'depth': depth,
+                            'out_ch': out_ch})
 
         # Retrieve downsampling method.
         Downsample = get_downsampling(downsampling)
@@ -89,7 +90,7 @@ class VariationalAutoencoder(tf.keras.layers.Layer):
 
         # Output layer convolution.
         self.out = tf.keras.layers.Conv3D(
-                            filters=IN_CH,
+                            filters=out_ch,
                             kernel_size=3,
                             strides=1,
                             padding='same',
