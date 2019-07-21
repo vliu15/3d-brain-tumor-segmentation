@@ -1,5 +1,14 @@
-import model.layers
-import model.utils
+"""Initializes the model module."""
 import model.encoder
+import model.decoder
+import model.variational_autoencoder
+import model.model
 
-__all__ = [model.layers, model.utils, model.encoder]
+from model.layer_utils import *
+
+
+__all__ = [model.encoder,
+           model.decoder,
+           model.variational_autoencoder,
+           model.model,
+           model.layer_utils]

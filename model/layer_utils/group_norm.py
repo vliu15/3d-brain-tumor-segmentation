@@ -1,56 +1,30 @@
 """
-    Taken from
+    Contains Keras group normalization class from
     https://github.com/titu1994/Keras-Group-Normalization/blob/master/group_norm.py
 """
 import tensorflow as tf
 from tensorflow.keras import initializers, constraints, regularizers
-from tensorflow.keras import backend as K
+
 
 class GroupNormalization(tf.keras.layers.Layer):
-    """Group normalization layer.
+    def __init__(self,
+                 groups=8,
+                 axis=-1,
+                 epsilon=1e-5,
+                 center=True,
+                 scale=True,
+                 beta_initializer='zeros',
+                 gamma_initializer='ones',
+                 beta_regularizer=None,
+                 gamma_regularizer=None,
+                 beta_constraint=None,
+                 gamma_constraint=None,
+                 **kwargs):
+        """ Initializes one group normalization layer.
 
-        Group Normalization divides the channels into groups and computes
-        within each group the mean and variance for normalization. GN's
-        computation is independent of batch sizes, and its accuracy is stable
-        in a wide range of batch sizes.
-    
-        Args:
-            groups (int): the number of groups for Group Normalization.
-            axis (int): the axis that should be normalized (typically the
-                features axis). For instance, after a `Conv2D` layer with
-                `data_format="channels_first"`, set `axis=1` in
-                `BatchNormalization`.
-            epsilon (float): small value added to variance to avoid dividing
-                by zero.
-            center (bool): if True, add offset of `beta` to normalized tensor.
-                If False, `beta` is ignored.
-            scale (bool): if True, multiply by `gamma`. If False, `gamma` is
-                not used. When the next layer is linear (also e.g. `nn.relu`),
-                this can be disabled since the scaling will be done by the next
-                layer.
-            beta_initializer: initializer for the beta weight.
-            gamma_initializer: initializer for the gamma weight.
-            beta_regularizer: optional regularizer for the beta weight.
-            gamma_regularizer: optional regularizer for the gamma weight.
-            beta_constraint: optional constraint for the beta weight.
-            gamma_constraint: optional constraint for the gamma weight.
-
-        Input shape:
-            Arbitrary. Use the keyword argument `input_shape`
-            (tuple of integers, does not include the samples axis)
-            when using this layer as the first layer in a model.
-
-        Output shape:
-            Same shape as input.
-
-        References:
-            [Group Normalization](https://arxiv.org/abs/1803.08494)
-    """
-
-    def __init__(self, groups=8, axis=1, epsilon=1e-5, center=True, scale=True,
-                    beta_initializer='zeros', gamma_initializer='ones',
-                    beta_regularizer=None, gamma_regularizer=None,
-                    beta_constraint=None, gamma_constraint=None, **kwargs):
+            References:
+                - [Group Normalization](https://arxiv.org/abs/1803.08494)
+        """
         super(GroupNormalization, self).__init__(**kwargs)
         self.supports_masking = True
         self.groups = groups
@@ -106,9 +80,8 @@ class GroupNormalization(tf.keras.layers.Layer):
             self.beta = None
         self.built = True
 
-    def call(self, inputs, **kwargs):
-        input_shape = K.int_shape(inputs)
-        tensor_input_shape = K.shape(inputs)
+    def call(self, inputs, training=None, **kwargs):
+        input_shape = list(inputs.shape)
 
         # Prepare broadcasting shape.
         reduction_axes = list(range(len(input_shape)))
@@ -117,38 +90,36 @@ class GroupNormalization(tf.keras.layers.Layer):
         broadcast_shape[self.axis] = input_shape[self.axis] // self.groups
         broadcast_shape.insert(1, self.groups)
 
-        reshape_group_shape = K.shape(inputs)
-        group_axes = [reshape_group_shape[i] for i in range(len(input_shape))]
+        group_axes = [input_shape[i] for i in range(len(input_shape))]
         group_axes[self.axis] = input_shape[self.axis] // self.groups
         group_axes.insert(1, self.groups)
 
         # Reshape inputs to new group shape.
         group_shape = [group_axes[0], self.groups] + group_axes[2:]
-        group_shape = K.stack(group_shape)
-        inputs = K.reshape(inputs, group_shape)
+        group_shape = tf.stack(group_shape)
+        inputs = tf.reshape(inputs, group_shape)
 
         group_reduction_axes = list(range(len(group_axes)))
         group_reduction_axes = group_reduction_axes[2:]
 
-        mean = K.mean(inputs, axis=group_reduction_axes, keepdims=True)
-        variance = K.var(inputs, axis=group_reduction_axes, keepdims=True)
+        mean, variance = tf.nn.moments(inputs, axes=group_reduction_axes, keepdims=True)
 
-        inputs = (inputs - mean) / (K.sqrt(variance + self.epsilon))
+        inputs = (inputs - mean) / (tf.math.sqrt(variance + self.epsilon))
 
         # Prepare broadcast shape.
-        inputs = K.reshape(inputs, group_shape)
+        inputs = tf.reshape(inputs, group_shape)
         outputs = inputs
 
         # In this case we must explicitly broadcast all parameters.
         if self.scale:
-            broadcast_gamma = K.reshape(self.gamma, broadcast_shape)
+            broadcast_gamma = tf.reshape(self.gamma, broadcast_shape)
             outputs = outputs * broadcast_gamma
 
         if self.center:
-            broadcast_beta = K.reshape(self.beta, broadcast_shape)
+            broadcast_beta = tf.reshape(self.beta, broadcast_shape)
             outputs = outputs + broadcast_beta
 
-        outputs = K.reshape(outputs, tensor_input_shape)
+        outputs = tf.reshape(outputs, input_shape)
 
         return outputs
 
