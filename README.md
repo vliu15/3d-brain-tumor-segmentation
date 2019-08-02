@@ -1,7 +1,7 @@
 # Volumetric Brain Tumor Segmentation
 This repository experiments with best techniques to improve dense, volumetric semantic segmentation. Specifically, the model is of U-net architectural style and includes variational autoencoder (for regularization), residual blocks, spatial and channel squeeze-excitation layers, and dense connections.
 
-## Note: Research Paper in repository as Paper2.pdf
+## Note: Research paper in repository as Paper2.pdf
 
 ## Model
 This is a variation of the [U-net](https://arxiv.org/pdf/1606.06650.pdf) architecture with [variational autoencoder regularization](https://arxiv.org/pdf/1810.11654.pdf). There are several architectural enhancements, including
