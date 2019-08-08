@@ -12,7 +12,7 @@ This is a variation of the [U-net](https://arxiv.org/pdf/1606.06650.pdf) archite
 ## Usage
 Dependencies are only supported for Python3 and can be found in `requirements.txt` (`numpy==1.15` for preprocessing and `tensorflow==2.0.0-alpha0` for model architecture, utilizing `tf.keras.Model` and `tf.keras.Layer` subclassing).
 
-The `VolumetricCNN` model can be found in `model/model.py` and contains an `inference` mode in addition to the `training` mode that `tf.Keras.Model` supports.
+The model can be found in `model/model.py` and contains an `inference` mode in addition to the `training` mode that `tf.Keras.Model` supports.
  - Specify `training=False, inference=True` to only receive the decoder output, as desired in test time.
  - Specify `training=False, inference=False` to receive both the decoder and variational autoencoder output to be able to run loss and metrics, as desired in validation time.
 
@@ -29,51 +29,61 @@ For each example, there are 4 modalities and 1 label, each of shape `240 x 240 x
  - Crop as much background as possible across all images. Final image sizes are `155 x 190 x 147`.
  - Serialize to `tf.TFRecord` format for convenience in training.
 
-The training and validation `.tfrecords` files are around 30GB and 3GB, respectively. See `scripts/preprocess.sh` for a detailed example of how to run preprocessing.
 ```
-python preprocess.py --brats_folder data/BraTS17TrainingData --create_val
+python preprocess.py \
+    --in_locs /path/to/BraTS17TrainingData \
+    --modalities t1ce,flair \
+    --truth seg \
+    --create_val
 ```
 
-> All command-line arguments can be found in `utils/arg_parser.py`.
+> All command-line arguments can be found in `args.py`.
 
 > There are 285 training examples in the BraTS 2017/2018 training sets, but for lack of validation set, the `--create_val` flag creates a 10:1 split, resulting in 260 and 25 training and validation examples, respectively.
 
 ### Training
-All hyperparameters proposed in the paper are used in training. See `scripts/train.sh` for a detailed example of how to run training. The size of the model can be adjusted in `utils/constants.py`. The input is randomly flipped across spatial axes with probability 0.5 and cropped to `128 x 128 x 128` per example in training (essentially making the training data stochastic). The validation set is created at the beginning of training and remains static.
+Most hyperparameters proposed in the paper are used in training. The input is randomly flipped across spatial axes with probability 0.5 and cropped to `128 x 128 x 128` per example in training (making the training data stochastic). The validation set is dynamically created each epoch in a similar fashion.
 ```
-python train.py --train_loc data/train.image_wise.tfrecords --val_loc data/val.image_wise.tfrecords --prepro_file data/image_mean_std.npy --args_file config.json
+python train.py \
+    --train_loc /path/to/train \
+    --val_loc /path/to/val \
+    --prepro_file /path/to/prepro/prepro.npy \
+    --save_folder checkpoint \
+    --crop_size 128,128,128
 ```
-
-> Use the `--n_val_sets` flag to specify how many crops to take to create the validation set. Increase for metric robustness.
 
 > Use the `--gpu` flag to run on GPU.
 
 ### Testing: Generating Segmentation Masks
-The testing script `test.py` run inference on unlabeled data provided as input by generating sample labels on each crop of the image, then stitching them together to form the complete mask over the whole image. See `scripts/test.sh` for a detailed example of how to run testing.
+The testing script `test.py` runs inference on unlabeled data provided as input by generating sample labels on the whole image, padded to a size that is compatible with downsampling. The VAE is not run in inference so the model is actually fully convolutional.
 ```
-python test.py --test_folder /path/to/test/data --prepro_file data/image_mean_std.npy --chkpt_file chkpt.hdf5
+python test.py \
+    --in_locs /path/to/test \
+    --modalities t1ce,flair \
+    --prepro_loc /path/to/prepro/prepro.npy \
+    --tumor_model checkpoint
 ```
-*You must specify the same model parameters as the ones use in training for the trained weights to be successfully loaded.*
+*Training arguments are saved in the checkpoint folder. This bypasses the need for manual model initialization.*
 
-> Use the `--stride` to indicate the stride between cropping to cover the input. `64` is used as default, and each image takes around ~20 seconds.
+> The `Interpolator` class is used to interpolate voxel sizes in rescaling so that all inputs can be resized to 1 mm^3.
 
-> Use the `--batch_size` flag to indicate the number of crops fed into the model at a time, per example.
+> NOTE: `test.py` is not fully debugged and functional. If needed please open an issue.
 
-> The `Interpolator` class is used to interpolate linearly depthwise, if some of the inputs are shallower in depth.
+
+### Skull Stripping
+Because BraTS contains skull-stripped images which are uncommon in actual applications, we support training and inference of skull stripping models. The same pipeline can be generalized, but using the NFBS skull-stripping dataset [here](http://preprocessed-connectomes-project.org/NFB_skullstripped/). Note that in model initialization and training, the number of output channels `--out_ch` would be different for these tasks.
+
+> If the testing data contains skull bits, run skull stripping and tumor segmentation sequentially in inference time by specifying the `--skull_model` flag. All preprocessing and training should work for both tasks as is.
 
 ### Results
-We run training on a V100 32GB GPU. Each epoch takes around ~10 minutes to run. Below is a sample training curve, using all default model parameters.
+We run training on a V100 32GB GPU with a batch size of 1. Each epoch takes around ~12 minutes to run. Below is a sample training curve, using all default model parameters.
 
 |Epoch|Training Loss|Training Dice Score|Validation Loss|Validation Dice Score|
 |:---:|:-----------:|:-----------------:|:-------------:|:-------------------:|
-|0    |127.561      |0.012              |121.369        |0.020                |
-|10   |42.413       |0.508              |38.686         |0.553                |
-|20   |37.583       |0.504              |36.580         |0.582                |
-|30   |34.323       |0.490              |33.333         |0.539                |
-|40   |31.133       |0.505              |30.656         |0.589                |
-|50   |28.587       |0.539              |30.266         |0.594                |
-|60   |26.653       |0.593              |27.696         |0.604                |
-|70   |24.800       |0.607              |27.082         |0.624                |
-
-## TODO:
- - [ ] Add preprocessing/training/inference on skull-stripping data for test cases.
+|0    |1.000        |0.134              |0.732          |0.248                |
+|50   |0.433        |0.598              |0.413          |0.580                |
+|100  |0.386        |0.651              |0.421          |0.575                |
+|150  |0.356        |0.676              |0.393          |0.594                |
+|200  |0.324        |0.692              |0.349          |0.642                |
+|250  |0.295        |0.716              |0.361          |0.630                |
+|300  |0.282        |0.729              |0.352          |0.644                |
