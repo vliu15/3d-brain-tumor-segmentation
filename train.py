@@ -19,8 +19,8 @@ def prepare_dataset(loc, batch_size, prepro_size, crop_size, out_ch, shuffle=Tru
 
         # Apply random intensity shift.
         _, var = tf.nn.moments(x, axes=(0, 1, 2), keepdims=True)
-        shift = tf.random.uniform((c,), -0.1, 0.1)
-        scale = tf.random.uniform((c,), 0.9, 1.1)
+        shift = tf.random.uniform((1, 1, 1, c), -0.1, 0.1)
+        scale = tf.random.uniform((1, 1, 1, c), 0.9, 1.1)
         x += shift * tf.sqrt(var)
         x *= scale
 
@@ -141,6 +141,7 @@ def train(args):
                 # Forward and loss.
                 with tf.GradientTape() as tape:
                     y_pred, y_vae, z_mean, z_logvar = model(x, training=True, inference=False)
+                    
                     loss = loss_fn(x, y, y_pred, y_vae, z_mean, z_logvar)
                     loss += tf.reduce_sum(model.losses)
 
@@ -164,7 +165,10 @@ def train(args):
             for x, y in tqdm(val_data, total=n_val, desc='Validation    '):
                 # Forward and loss.
                 y_pred, y_vae, z_mean, z_logvar = model(x, training=False, inference=False)
+
                 loss = loss_fn(x, y, y_pred, y_vae, z_mean, z_logvar)
+                loss += tf.reduce_sum(model.losses)
+
                 macro_dice, micro_dice = dice_fn(y, y_pred)
 
                 val_loss.update_state(loss)

@@ -1,4 +1,3 @@
-"""Contains custom models for 3D semantic segmentation."""
 import tensorflow as tf
 
 from layers.encoder import Encoder
@@ -62,6 +61,7 @@ class Model(tf.keras.models.Model):
             'Cannot run training and inference modes simultaneously.'
 
         inputs = self.encoder(inputs, training=training)
+
         y_pred = self.decoder((inputs[-1], inputs[:-1]), training=training)
 
         if inference:

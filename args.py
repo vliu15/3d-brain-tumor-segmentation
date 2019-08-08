@@ -119,7 +119,7 @@ class TrainArgParser(BaseArgParser):
 
         # Model args.
         self.parser.add_argument('--data_format', type=str, dest='model_args.data_format',
-                default='channels_last', choices=['channels_last', 'channels_first'],
+                default='channels_first', choices=['channels_last', 'channels_first'],
                 help='Data format to be passed through the model.')
         self.parser.add_argument('--base_filters', type=int, dest='model_args.base_filters', default=32,
                 help='Number of filters in the base convolutional layer.')
@@ -205,58 +205,69 @@ class TestArgParser(BaseArgParser):
                 help='Comma-separated paths of test data.')
         self.parser.add_argument('--modalities', type=str, required=True,
                 help='Comma-separated modalities to be used as input')
+        self.parser.add_argument('--truth', type=str, default='',
+                help='Truth label pattern to use (optional).')
 
         # Training and preprocessing stats.
-        self.parser.add_argument('--prepro_loc', type=str, required=True,
-                help='Path to Numpy preprocessing dump.')
+        self.parser.add_argument('--tumor_prepro', type=str, required=True,
+                help='Path to Numpy preprocessing dump for tumor segmentation.')
+        self.parser.add_argument('--skull_prepro', type=str, default='',
+                help='Path to Numpy preprocessing dump for skull segmentation.')
         self.parser.add_argument('--tumor_model', type=str, required=True,
                 help='Path to checkpoint folder for tumor segmentation.')
         self.parser.add_argument('--skull_model', type=str, default='',
                 help='Path to checkpoint folder for skull-stripping segmentation.')
 
-        # Crop generation and segmentation.
-        self.parser.add_argument('--crop_size', type=str, default='128,128,128',
-                help='Crop size of image (comma-separated h,w,d).')
-        self.parser.add_argument('--stride', type=int, default=128,
-                help='Stride at which to take sample crops from input image.')
-        self.parser.add_argument('--batch_size', type=int, default=8,
-                help='Batch size of crops to load into model.')
+        # Input normalization parameters.
+        self.parser.add_argument('--order', type=int, default=3,
+                help='Order of interpolation function to be used in voxel resizing.')
+        self.parser.add_argument('--mode', type=str, default='reflect',
+                help='Method of handling image edges in interpolation.')
+
+        # Test time augmentation and segmentation.
+        self.parser.add_argument('--spatial_tta', action='store_true', default=True,
+                help='Whether to apply spatial augmentation on all spatial axes.')
+        self.parser.add_argument('--channel_tta', type=int, default=0,
+                help='Additional intensity shifting samples to take.')
         self.parser.add_argument('--threshold', type=float, default=0.5,
                 help='Threshold at which to create mask from probabilities.')
-        self.parser.add_argiument('--gpu', action='store_true', default=False,
+        self.parser.add_argument('--gpu', action='store_true', default=False,
                 help='Whether to evaluate on GPU.')
 
     def parse_args(self):
         args = self.parser.parse_args()
+        args.modalities = args.modalities.split(',')
+        args.in_locs = args.in_locs.split(',')
 
         # Assert proper combination of inputs.
         assert args.threshold > 0 and args.threshold < 1, \
             'Threshold must be a probability between (0, 1).'
+        if args.skull_model:
+            assert args.skull_prepro, 'Need skull preprocessing stats if model is provided.'
+        args.skull_strip = bool(args.skull_model)
 
-        # Load tumor segmentation model args.
+        # Load model args.
         with open(os.path.join(args.tumor_model, 'train_args.pkl'), 'rb') as f:
             train_args = pickle.load(f)
             args.tumor_model_args = train_args['model_args']
-
-        # Load skull strip segmentation model args.
+            args.tumor_spatial_res = 2 ** args.tumor_model_args['depth']
+            args.tumor_crop_size = train_args['crop_size']
         if args.skull_model:
             with open(os.path.join(args.skull_model, 'train_args.pkl'), 'rb') as f:
                 train_args = pickle.load(f)
                 args.skull_model_args = train_args['model_args']
-        else:
-            args.skull_model_args = None
+                args.skull_spatial_res = 2 ** args.skull_model_args['depth']
+                args.skull_crop_size = train_args['crop_size']
+
+        # Load prepro stats.
+        args.tumor_prepro = np.load(args.tumor_prepro).item()
+        if args.skull_prepro:
+            args.skull_prepro = np.load(args.skull_prepro).item()
 
         # Check data format and GPU compatibility.
         args.device = '/device:GPU:0' if args.gpu else '/cpu:0'
         if not args.gpu:
             assert args.tumor_model_args['data_format'] == 'channels_last' and args.skull_model_args['data_format'], \
                 'tf.keras.layers.Conv3D only supports `channels_last` input for CPU.'
-
-        # Load preprocessing norm stats.
-        args.prepro_stats = np.load(args.prepro_file).item()
-
-        # Set crop size.
-        args.crop_size = args.crop_size.split(',')
-        args.crop_size = [int(s) for s in args.crop_size]
 
         return args

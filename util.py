@@ -33,7 +33,7 @@ class DiceCoefficient(object):
         self.data_format = data_format
 
     def __call__(self, y_true, y_pred):
-        dice_axes = (0, 1, 2, 3) if self.data_format == 'channels_last' else (0, 2, 3, 4)
+        dice_axes = (0, 1, 2) if self.data_format == 'channels_last' else (0, 2, 3, 4)
         onehot_axis = -1 if self.data_format == 'channels_last' else 1
 
         # Mask out values that correspond to values < 0.5.

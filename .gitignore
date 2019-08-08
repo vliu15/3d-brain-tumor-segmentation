@@ -1,5 +1,6 @@
 # Custom output files
 data/
+scripts/
 checkpoint*/
 *.out
 
