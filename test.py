@@ -1,255 +1,277 @@
-"""Contains inference script for generating segmentation mask."""
 import os
 import glob
-import tensorflow as tf
-import numpy as np
 import scipy
+import numpy as np
 import nibabel as nib
+import tensorflow as tf
 from tqdm import tqdm
-import random
 from scipy.ndimage import zoom
 
-from utils.arg_parser import test_parser
-from utils.constants import *
-from model.model import VolumetricCNN
+from args import TestArgParser
+from util import DiceCoefficient
+from model import Model
 
 
 class Interpolator(object):
-    def __init__(self, data_format, order=3, mode='reflect'):
-        self.data_format = data_format
+    def __init__(self, modalities, order=3, mode='reflect'):
+        self.modalities = modalities
         self.order = order
         self.mode = mode
 
-    def __call__(self, subject_folder):
+    def __call__(self, path):
         """Extracts Numpy image and normalizes it to 1 mm^3."""
         # Extract raw images from each.
         image = []
         pixdim = []
         affine = []
         
-        for name in BRATS_MODALITIES:
-            file_card = glob.glob(os.path.join(subject_folder, '*' + name + '*' + '.nii' + '*'))[0]
+        for name in self.modalities:
+            file_card = glob.glob(os.path.join(path, '*' + name + '*' + '.nii' + '*'))[0]
             img = nib.load(file_card)
 
-            array.append(np.array(img.dataobj).astype(np.float32))
+            image.append(np.array(img.dataobj).astype(np.float32))
             pixdim.append(img.header['pixdim'][:4])
             affine.append(np.stack([img.header['srow_x'],
                                     img.header['srow_y'],
                                     img.header['srow_z'],
                                     np.array([0., 0., 0., 1.])], axis=0))
-            
-            axis = -1 if self.data_format == 'channels_last' else 0
 
-            # Prepare image.
-            image = np.stack(image, axis=axis)
-            self.pixdim = np.mean(pixdim, axis=0)
-            self.affine = np.mean(affine, axis=0)
+        # Prepare image.
+        image = np.stack(image, axis=-1)
+        self.pixdim = np.mean(pixdim, axis=0, dtype=np.float32)
+        self.affine = np.mean(affine, axis=0, dtype=np.float32)
 
-            # Scale voxel size.
-            zoomdim = list(pixdim[:-1])
-            zoomdim.insert(axis, 1.0)
-            image = zoom(image, zoomdim, order=self.order, mode=self.mode)
+        # Rescale and interpolate voxels spatially.
+        if np.any(self.pixdim[:-1] != 1.0):
+            image = zoom(image, self.pixdim[:-1] + [1.0], order=self.order, mode=self.mode)
+        
+        # Rescale and interpolate voxels depthwise (along time).
+        if self.pixdim[-1] != 1.0:
+            image = zoom(image, [1.0, 1.0, self.pixdim[-1], 1.0], order=self.order, mode=self.mode)
 
-            # Interpolate depth.
-            depthzoom = np.ones_like(self.pixdim)
-            depthzoom[axis] = self.pixdim[-1]
-            image = zoom(image, list(depthzoom), order=self.order, mode=self.mode)
+        # Mask out background voxels.
+        mask = np.max(image, axis=-1, keepdims=True)
+        mask = (mask > 0).astype(np.float32)
 
-            return image
+        return image, mask
 
-    def reverse(self, output):
+    def reverse(self, output, path):
         """Reverses the interpolation performed in __call__."""
-        output = output.numpy()
-        axis = -1 if self.data_format == 'channels_last' else 0
+        # Scale back spatial voxel interpolation.
+        if np.any(self.pixdim[:-1] != 1.0):
+            output = zoom(output, 1.0 / self.pixdim[:-1], order=self.order, mode=self.mode)
 
-        # Reverse depth interpolation.
-        depthzoom = np.ones_like(self.pixdim)
-        depthzoom[axis] = 1.0 / self.pixdim[-1]
-        output = zoom(output, list(depthzoom), order=self.order, mode=self.mode)
+        # Scale back depthwise voxel interpolation.
+        if self.pixdim[-1] != 1.0:
+            output = zoom(output, [1.0, 1.0, 1.0 / self.pixdim[-1]], order=self.order, mode=self.mode)
 
-        # Reverse voxel scaling.
-        zoomdim = list(1.0 / pixdim[:-1])
-        output = zoom(output, zoomdim, order=self.order, mode=self.mode)
+        # Save file.
+        nib.save(nib.Nifti1Image(output, self.affine),
+                    os.path.join(path, 'mask.nii'))
 
         return output
-        
-
-class Generator(object):
-    def __init__(self, batch_size, data_format, stride=32):
-        self.batch_size = batch_size
-        self.data_format = data_format
-        self.stride = stride
-
-    def __call__(self, image):
-        """Generates crops with stride to create mask."""
-        def _get_crop(h, w, d):
-            if self.data_format == 'channels_last':
-                return image[h-H:h, w-W:w, d-D:d, :]
-            else:
-                return image[:, h-H:h, w-W:w, d-D:d]
-
-        iH, iW, iD = image.shape[:-1] if self.data_format == 'channels_last' else image.shape[1:]
-        batch, idxs = [], []
-
-        # Loop over all crops.
-        for h in range(H, iH + self.stride - 1, self.stride):
-            for w in range(W, iW + self.stride - 1, self.stride):
-                for d in range(D, iD + self.stride - 1, self.stride):
-                    h = min(h, iH)
-                    w = min(w, iW)
-                    d = min(d, iD)
-
-                    batch.append(_get_crop(h, w, d))
-                    idxs.append((h, w, d))
-
-                    if len(batch) == self.batch_size:
-                        yield (tf.stack(batch, axis=0), idxs)
-                        batch, idxs = [], []
-
-        if len(batch) > 0:
-            yield (tf.stack(batch, axis=0), idxs)
 
 
-class Segmentor(object):
-    def __init__(self, model, data_format, threshold=0.5, **kwargs):
+class TestTimeAugmentor(object):
+    """Handles full inference on input with test-time augmentation."""
+    def __init__(self,
+                 mean,
+                 std,
+                 model,
+                 model_data_format,
+                 spatial_tta=True,
+                 channel_tta=0,
+                 threshold=0.5):
+        self.mean = mean
+        self.std = std
         self.model = model
-        self.data_format = data_format
+        self.model_data_format = model_data_format
+        self.channel_tta = channel_tta
         self.threshold = threshold
 
-    def __call__(self, image, generator):
-        if self.data_format == 'channels_last':
-            output = np.zeros(shape=list(image.shape[:-1]) + [OUT_CH], dtype=np.float32)
+        self.channel_axis = -1 if self.model_data_format == 'channels_last' else 1
+        self.spatial_axes = [1, 2, 3] if self.model_data_format == 'channels_last' else [2, 3, 4]
+
+        if spatial_tta:
+            self.augment_axes = [self.spatial_axes, []]
+            for axis in self.spatial_axes:
+                pairs = self.spatial_axes.copy()
+                pairs.remove(axis)
+                self.augment_axes.append([axis])
+                self.augment_axes.append(pairs)
         else:
-            output = np.zeros(shape=[OUT_CH] + list(image.shape[1:]), dtype=np.float32)
+            self.augment_axes = [[]]
 
-        for batch, idxs in generator(image):
-            # Generate predictions.
-            y, *_ = self.model(batch, training=False, inference=True)
-            y = tf.clip_by_value(y, 1e-7, 1 - 1e-7)
+    def __call__(self, x, bmask):
+        # Normalize and prepare input (assumes input data format of 'channels_last').
+        x = (x - self.mean) / self.std
 
-            # Accumulate predicted probabilities.
-            for p, (h, w, d) in zip(y.numpy(), idxs):
-                if self.data_format == 'channels_last':
-                    output[h-H:h, w-W:w, d-D:d, :] = np.add(output[h-H:h, w-W:w, d-D:d, :], p)
-                else:
-                    output[:, h-H:h, w-W:w, d-D:d] = np.add(output[:, h-H:h, w-W:w, d-D:d], p)
+        # Transpose to channels_first data format if required by model.
+        if self.model_data_format == 'channels_first':
+            x = tf.transpose(x, (3, 0, 1, 2))
+            bmask = tf.transpose(bmask, (3, 0, 1, 2))
+        x = tf.expand_dims(x, axis=0)
+        bmask = tf.expand_dims(bmask, axis=0)
 
-        # Normalize probabilities.
-        # output /= tf.reduce_sum(output, axis=-1 if self.data_format == 'channels_last' else 0)
+        # Initialize list of inputs to feed model.
+        y = []
 
-        return output
+        # Create shape for intensity shifting.
+        shape = [1, 1, 1]
+        shape.insert(self.channel_axis, x.shape[self.channel_axis])
 
-    def create_mask(self, output):
-        axis = -1 if self.data_format == 'channels_last' else 0
+        if self.channel_tta:
+            _, var = tf.nn.moments(x, axes=self.spatial_axes, keepdims=True)
+            std = tf.sqrt(var)
 
-        # Mask out values that correspond to values < threshold.
-        mask = tf.reduce_max(output, axis=axis)
-        mask = tf.cast(mask > self.threshold, tf.int32)
+        # Apply spatial augmentation.
+        for flip in self.augment_axes:
+
+            # Run inference on spatially augmented input.
+            aug = tf.reverse(x, axis=flip)
+
+            aug, *_ = self.model(aug, training=False, inference=True)
+            y.append(tf.reverse(aug, axis=flip))
+
+            for _ in range(self.channel_tta):
+                shift = tf.random.uniform(shape, -0.1, 0.1)
+                scale = tf.random.uniform(shape, 0.9, 1.1)
+
+                # Run inference on channel augmented input.
+                aug = (aug + shift * std) * scale
+                aug = self.model(aug, training=False, inference=True)
+                aug = tf.reverse(aug, axis=flip)
+                y.append(aug)
+
+        # Aggregate outputs.
+        y = tf.concat(y, axis=0)
+        y = tf.reduce_mean(y, axis=0, keepdims=True)
+
+        # Mask out zero-valued voxels.
+        y *= bmask
 
         # Take the argmax to determine label.
-        output = tf.argmax(output, axis=axis, output_type=tf.int32)
+        # y = tf.argmax(y, axis=self.channel_axis, output_type=tf.int32)
 
-        # Mask out values that correspond to <0.5 probability.
-        output *= mask
+        # Transpose back to channels_last data format.
+        y = tf.squeeze(y, axis=0)
+        if self.model_data_format == 'channels_first':
+            y = tf.transpose(y, (1, 2, 3, 0))
 
-        # Convert [0, 1, 2] to [1, 2, 3] for label consistency.
-        output += 1
-
-        # Replace label `3` with `4` for consistency with data.
-        output = output.numpy()
-        np.place(output, output >= 3, [4])
-
-        return output
+        return y
 
 
-def dice_coefficient(y_true, y_pred, eps=1.0):
-    """Returns dice coefficient of one prediction."""
-    # Calculate mask for label 1.
-    true_ones = tf.cast(tf.equal(y_true, 1), tf.float32)
-    pred_ones = tf.cast(tf.equal(y_pred, 1), tf.float32)
+def pad_to_spatial_res(res, x, mask):
+    # Assumes that x and mask are channels_last data format.
+    res = tf.convert_to_tensor([res])
+    shape = tf.convert_to_tensor(x.shape[:-1], dtype=tf.int32)
+    shape = res - (shape % res)
+    pad = [[0, shape[0]],
+           [0, shape[1]],
+           [0, shape[2]],
+           [0, 0]]
 
-    # Calculate mask for label 2.
-    true_twos = tf.cast(tf.equal(y_true, 2), tf.float32)
-    pred_twos = tf.cast(tf.equal(y_pred, 2), tf.float32)
+    orig_shape = list(x.shape[:-1])
+    x = tf.pad(x, pad, mode='CONSTANT', constant_values=0.0)
+    mask = tf.pad(mask, pad, mode='CONSTANT', constant_values=0.0)
 
-    # Calculate mask for label 4.
-    true_fours = tf.cast(tf.equal(y_true, 4), tf.float32)
-    pred_fours = tf.cast(tf.equal(y_pred, 4), tf.float32)
-
-    # Calculate mask for all positives.
-    true_all = tf.cast(y_true > 0, tf.float32)
-    pred_all = tf.cast(y_pred > 0, tf.float32)
-
-    # Calculate per-label dice scores.
-    dice_ones = (tf.reduce_sum(true_ones * pred_ones) + eps) / (tf.reduce_sum(true_ones + pred_ones) + eps)
-    dice_twos = (tf.reduce_sum(true_twos * pred_twos) + eps) / (tf.reduce_sum(true_twos + pred_twos) + eps)
-    dice_fours = (tf.reduce_sum(true_fours * pred_fours) + eps) / (tf.reduce_sum(true_fours + pred_fours) + eps)
-
-    # Calculated macro- and micro- dice scores.
-    dice_macro = tf.reduce_mean([dice_ones, dice_twos, dice_fours])
-    dice_micro = (tf.reduce_sum(true_all * pred_all) + eps) / (tf.reduce_sum(true_all + pred_all) + eps)
+    return x, mask, orig_shape
     
-    return dice_macro, dice_micro
-
 
 def main(args):
-    # Initialize.
-    data = np.load(args.prepro_file).item()
-    voxel_mean = tf.convert_to_tensor(data['mean'], dtype=tf.float32)
-    voxel_std = tf.convert_to_tensor(data['std'], dtype=tf.float32)
-    
-    # Initialize model.
-    model = VolumetricCNN(**args.model_args)
+    in_ch = len(args.modalities)
 
-    # Build model with initial forward pass.
-    _ = model(tf.zeros(shape=(1, H, W, D, IN_CH) if args.data_format == 'channels_last' \
-                                    else (1, IN_CH, H, W, D), dtype=tf.float32))
-    # Load weights.
-    model.load_weights(args.chkpt_file)
+    # Initialize model(s) and load weights / preprocessing stats.
+    tumor_model = Model(**args.tumor_model_args)
+    tumor_crop_size = args.tumor_model_args['crop_size']
+    _ = tumor_model(tf.zeros(shape=[1] + tumor_crop_size + [in_ch] if args.tumor_model_args['data_format'] == 'channels_last' \
+                                    else [1, in_ch] + tumor_crop_size, dtype=tf.float32))
+    tumor_model.load_weights(os.path.join(args.tumor_model, 'chkpt.hdf5'))
+    tumor_mean = tf.convert_to_tensor(args.tumor_prepro['norm']['mean'], dtype=tf.float32)
+    tumor_std = tf.convert_to_tensor(args.tumor_prepro['norm']['std'], dtype=tf.float32)
 
-    # Initialize interpolator, generator, and segmentor.
-    interpolator = Interpolator(args.model_args.data_format, order=args.order, mode=args.mode)
-    generator = Generator(args.model_args.data_format, args.batch_size, stride=args.stride)
-    segmentor = Segmentor(model, args.model_args.data_format, threshold=args.threshold)
+    if args.skull_strip:
+        skull_model = Model(**args.skull_model_args)
+        skull_crop_size = args.skull_model_args['crop_size']
+        _ = model(tf.zeros(shape=[1] + skull_crop_size + [in_ch] if args.skull_model_args['data_format'] == 'channels_last' \
+                                    else [1, in_ch] + skull_crop_size, dtype=tf.float32))
+        skull_model.load_weights(os.path.join(args.skull_model, 'chkpt.hdf5'))
+        skull_mean = tf.convert_to_tensor(args.skull_prepro['norm']['mean'], dtype=tf.float32)
+        skull_std = tf.convert_to_tensor(args.skull_prepro['norm']['std'], dtype=tf.float32)
 
-    # Loop through each patient.
-    for subject_folder in tqdm(glob.glob(os.path.join(args.test_folder, '*'))):
-        with tf.device(args.device):
-            # Rescale and interpolate input image.
-            X = interpolator(subject_folder)
+    # Initialize helper classes for inference and evaluation (optional).
+    dice_fn = DiceCoefficient(data_format='channels_last')
+    interpolator = Interpolator(args.modalities, order=args.order, mode=args.mode)
+    tumor_ttaugmentor = TestTimeAugmentor(
+                                tumor_mean,
+                                tumor_std,
+                                tumor_model,
+                                args.tumor_model_args['data_format'],
+                                spatial_tta=args.spatial_tta,
+                                channel_tta=args.channel_tta,
+                                threshold=args.threshold)
+    if args.skull_strip:
+        skull_ttaugmentor = TestTimeAugmentor(
+                                    skull_mean,
+                                    skull_std,
+                                    skull_model,
+                                    args.skull_model_args['data_format'],
+                                    spatial_tta=args.spatial_tta,
+                                    channel_tta=args.channel_tta,
+                                    threshold=args.threshold)
 
-            # If data is labeled, extract label.
-            try:
-                file_card = glob.glob(os.path.join(subject_folder, '*' + name + '*' + '.nii' + '*'))[0]
-                y = np.array(nib.load(file_card).dataobj).astype(np.float32)
-                y = tf.expand_dims(y, axis=axis)
-            except:
-                y = None
+    for loc in args.in_locs:
+        for path in tqdm(glob.glob(os.path.join(loc, '*'))):
+            with tf.device(args.device):
+                # If data is labeled, extract label.
+                try:
+                    file_card = glob.glob(os.path.join(path, '*' + args.truth + '*' + '.nii' + '*'))[0]
+                    y = np.array(nib.load(file_card).dataobj).astype(np.float32)
+                    y = tf.expand_dims(y, axis=-1)
+                except:
+                    y = None
 
-            # Normalize input image.
-            X = (X - voxel_mean) / voxel_std
+                # Rescale and interpolate input image.
+                x, mask = interpolator(path)
 
-            # Generate probabilities.
-            y_pred = segmentor(X, generator)
+                # Strip MRI brain of skull and eye sockets.
+                if args.skull_strip:
+                    x, pad_mask, pad = pad_to_spatial_res(          # Pad to spatial resolution
+                                        args.skull_spatial_res,
+                                        x,
+                                        mask)
+                    skull_mask = skull_ttaugmentor(x, pad_mask)     # Inference with test time augmentation.
+                    skull_mask = 1.0 - skull_mask                   # Convert skull positives into negatives.
+                    x *= skull_mask                                 # Mask out skull voxels.
+                    x = tf.slice(x,                                 # Remove padding.
+                                 [0, 0, 0, 0],
+                                 pad + [-1])
 
-            # Compress interpolation (if necessary).
-            y_pred = interpolator.reverse(y_pred)
+                # Label brain tumor categories per voxel.
+                x, pad_mask, pad = pad_to_spatial_res(              # Pad to spatial resolution.
+                                        args.tumor_spatial_res,
+                                        x,
+                                        mask)
+                tumor_mask = tumor_ttaugmentor(x, pad_mask)         # Inference with test time augmentation.
+                tumor_mask = tf.slice(tumor_mask,                   # Remove padding.
+                                      [0, 0, 0, 0],
+                                      pad + [-1])
+                tumor_mask += 1                                     # Convert [0,1,2] to [1,2,3] for label consistency.
+                tumor_mask = tumor_mask.numpy()
+                np.place(tumor_mask, tumor_mask >= 3, [4])          # Replace label `3` with `4` for label consistency.
 
-            # Create mask.
-            y_pred = segmentor.create_mask(y_pred)
-
-            # If label is available, score the prediction.
-            if y is not None:
-                macro, micro = dice_coefficient(y, y_pred, eps=1.0)
-                print('{}. Macro: {ma: 1.4f}. Micro: {mi:1.4f}'
-                        .format(subject_folder.split('/')[-1], ma=macro, mi=micro), flush=True)
-
-        # Save as Nifti.
-        nib.save(nib.Nifti1Image(y_pred, affine),
-                 os.path.join(args.test_folder, subject_folder, 'mask.nii'))
+                # Reverse interpolation and save as .nii.
+                y_pred = interpolator.reverse(tumor_mask, path)
+                
+                # If label is available, score the prediction.
+                if y is not None:
+                    macro, micro = dice_fn(y, y_pred)
+                    print('{}. Macro: {ma: 1.4f}. Micro: {mi: 1.4f}'
+                            .format(path.split('/')[-1], ma=macro, mi=micro), flush=True)
 
 
 if __name__ == '__main__':
-    args = test_parser()
+    parser = TestArgParser()
+    args = parser.parse_args()
     print('Test args: {}'.format(args))
     main(args)

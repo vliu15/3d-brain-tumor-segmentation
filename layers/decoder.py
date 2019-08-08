@@ -1,9 +1,8 @@
 """Contains custom convolutional decoder class."""
 import tensorflow as tf
 
-from model.layer_utils.resnet import ResnetBlock
-from model.layer_utils.upsample import get_upsampling
-from utils.constants import OUT_CH
+from layers.resnet import ResnetBlock
+from layers.upsample import get_upsampling
 
 
 class Decoder(tf.keras.layers.Layer):
@@ -14,7 +13,8 @@ class Decoder(tf.keras.layers.Layer):
                  l2_scale=1e-5,
                  upsampling='conv',
                  base_filters=16,
-                 depth=4):
+                 depth=4,
+                 out_ch=3):
         """ Initializes the model decoder: consists of an alternating
             series of ResNet blocks with dense connections and upsampling layers.
         """
@@ -27,7 +27,8 @@ class Decoder(tf.keras.layers.Layer):
                             'l2_scale': l2_scale,
                             'upsampling': upsampling,
                             'base_filters': base_filters,
-                            'depth': depth})
+                            'depth': depth,
+                            'out_ch': out_ch})
 
         # Retrieve upsampling method.
         Upsample = get_upsampling(upsampling)
@@ -49,21 +50,10 @@ class Decoder(tf.keras.layers.Layer):
                             data_format=data_format,
                             l2_scale=l2_scale)
             self.levels.append([upsample, res, conv])
-        
-        # Binary classification.
-        self.bin = tf.keras.layers.Conv3D(
-                                filters=1,
-                                kernel_size=1,
-                                strides=1,
-                                padding='same',
-                                activation='sigmoid',
-                                data_format=data_format,
-                                kernel_regularizer=tf.keras.regularizers.l2(l=l2_scale),
-                                kernel_initializer='glorot_normal')
 
         # Output multiclass classification.
         self.out = tf.keras.layers.Conv3D(
-                                filters=OUT_CH,
+                                filters=out_ch,
                                 kernel_size=1,
                                 strides=1,
                                 padding='same',
@@ -87,13 +77,10 @@ class Decoder(tf.keras.layers.Layer):
             # Pass through convolutional block.
             inputs = conv(inputs, training=training)
 
-        # Mask with binary classification.
-        binary = self.bin(inputs)
-
         # Map convolution to number of classes.
         inputs = self.out(inputs)
 
-        return inputs, binary
+        return inputs
 
     def get_config(self):
         return self.config
